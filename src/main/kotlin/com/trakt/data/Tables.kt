@@ -21,7 +21,8 @@ class UserEntity(id: EntityID<Int>) : IntEntity(id) {
   var timeScore by UsersTable.timeScore
   var hasRegular by UsersTable.hasRegular
 
-  val qualifies = timeScore >= ProgressManager.TIME_SCORE_THRESHOLD &&
+  val qualifies: Boolean
+    get() = timeScore >= ProgressManager.TIME_SCORE_THRESHOLD &&
       messageScore >= ProgressManager.MESSAGE_SCORE_THRESHOLD
 
 }

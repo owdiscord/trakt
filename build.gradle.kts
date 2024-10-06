@@ -23,6 +23,7 @@ java {
 
 dependencies {
     testImplementation(kotlin("test"))
+    implementation("com.h2database:h2:2.2.220")
     implementation("dev.kord:kord-core:0.14.0")
     implementation(kotlin("stdlib"))
     implementation("org.jetbrains.exposed:exposed-core:$exposedVersion")
@@ -34,6 +35,7 @@ dependencies {
     implementation("org.jetbrains.exposed:exposed-json:$exposedVersion")
     implementation("org.jetbrains.exposed:exposed-money:$exposedVersion")
     implementation("org.jetbrains.exposed:exposed-spring-boot-starter:$exposedVersion")
+//    implementation("org.slf4j:slf4j-simple:2.0.16")
 }
 
 tasks.test {

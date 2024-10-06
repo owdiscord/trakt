@@ -7,15 +7,19 @@ import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
 import org.jetbrains.exposed.sql.transactions.transaction
 
 class UserRepository {
-  private lateinit var db: Database
-  fun initUserRepository() {
-    db = Database.connect("jdbc:h2:mem:test", driver = "org.h2.Driver", user = "root")
+  private val db: Database = Database.connect("jdbc:h2:mem:test;DB_CLOSE_DELAY=-1")
 
+  init {
     transaction { SchemaUtils.create(UsersTable) }
   }
 
+  /**
+   * Load this user's message score from the repository, or 0 if we don't know them.
+   */
   fun messageScoreForUser(snowflake: ULong): Int {
-    return UserEntity.find { UsersTable.snowflake eq snowflake }.firstOrNull()?.messageScore ?: 0
+    return transaction {
+      UserEntity.find { UsersTable.snowflake eq snowflake }.firstOrNull()?.messageScore ?: 1
+    }
   }
 
   /**

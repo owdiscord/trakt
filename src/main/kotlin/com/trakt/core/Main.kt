@@ -13,10 +13,13 @@ suspend fun main(args: Array<String>) {
 
   val bot = Kord("MTI5MjU4NDUyNzg0NzQ4OTU3OQ.GwK1Ai.t6L7rS-zArLu-tqilDqyXakd-npk9YxDmtcBUE")
 
+  println("created bot")
   val progressManager = ProgressManager(UserRepository()).startCollection()
 
+  println("collection started")
   bot.on<MessageCreateEvent> {
-    if (member?.isBot != false) return@on
+    if (member?.isBot == true) return@on
+    println("msg: user=${member?.id}, channel=${message.channel}")
     member?.id?.also { progressManager.submitProgress(it.value) }
   }
 
@@ -24,5 +27,6 @@ suspend fun main(args: Array<String>) {
 
   bot.on<MemberJoinEvent> {  }
 
+  println("doing login")
   bot.login()
 }
