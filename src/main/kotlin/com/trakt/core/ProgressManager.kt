@@ -66,6 +66,8 @@ class ProgressManager {
   }
 
   companion object {
+    const val TIME_SCORE_THRESHOLD = 14
+    const val MESSAGE_SCORE_THRESHOLD = 560
     private val PROGRESS_DELAY: Duration = 900.seconds
     private val timeSource = TimeSource.Monotonic
   }

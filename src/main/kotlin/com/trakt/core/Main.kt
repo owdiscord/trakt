@@ -2,9 +2,13 @@ package com.trakt.core
 
 import com.trakt.data.initUserRepository
 import dev.kord.core.Kord
+import dev.kord.core.event.guild.BanAddEvent
+import dev.kord.core.event.guild.MemberJoinEvent
+import dev.kord.core.event.guild.MemberUpdateEvent
 import dev.kord.core.event.message.MessageCreateEvent
 import dev.kord.core.event.role.RoleUpdateEvent
 import dev.kord.core.on
+import dev.kord.gateway.GuildBanAdd
 
 suspend fun main(args: Array<String>) {
   println("Hello World!")
@@ -22,5 +26,7 @@ suspend fun main(args: Array<String>) {
 
   bot.on<MessageCreateEvent> { processMessage(this, progressManager) }
 
-  bot.on<RoleUpdateEvent> {  }
+  bot.on<BanAddEvent> {  }
+
+  bot.on<MemberJoinEvent> {  }
 }

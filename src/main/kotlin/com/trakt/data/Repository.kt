@@ -28,6 +28,10 @@ class User(id: EntityID<Int>) : IntEntity(id) {
   var messageScoreTime by Users.messageScoreTime
   var timeScore by Users.timeScore
   var hasRegular by Users.hasRegular
+
+  val qualifies = timeScore >= ProgressManager.TIME_SCORE_THRESHOLD &&
+      messageScore >= ProgressManager.MESSAGE_SCORE_THRESHOLD
+
 }
 
 fun initUserRepository() {
@@ -40,20 +44,42 @@ fun addUser(snowflake: ULong) {
   transaction { User.new { this.snowflake = snowflake } }
 }
 
-fun getUser(snowflake: ULong): User? {
-  return User.find { Users.snowflake eq snowflake }.firstOrNull()
-}
-
 fun messageScoreForUser(snowflake: ULong): Int {
   return User.find { Users.snowflake eq snowflake }.firstOrNull()?.messageScore ?: 0
 }
 
-fun writeProgress(userScores: List<ProgressManager.Progress>) {
+/**
+ * Write the cached list of message score progress to DB. Return a list of users who now qualify for award as a result
+ * of this change.
+ */
+fun writeProgress(userScores: List<ProgressManager.Progress>): List<ULong> {
+  val result = ArrayList<ULong>()
   transaction {
     for (userScore in userScores) {
       User.findSingleByAndUpdate(Users.snowflake eq userScore.snowflake) {
         it.messageScore = userScore.messageScore
+        if (it.qualifies) {
+          result.add(it.snowflake)
+        }
       }
     }
   }
+  return result
+}
+
+/**
+ * Update all known users' time scores if they are below the threshold. Return a list of users who now qualify for award
+ * as a result of this change.
+ */
+fun addTimeScore(): List<ULong> {
+  val result = ArrayList<ULong>()
+  transaction {
+    for (user in User.find { Users.timeScore less ProgressManager.TIME_SCORE_THRESHOLD }) {
+      user.timeScore++
+      if (user.qualifies) {
+        result.add(user.snowflake)
+      }
+    }
+  }
+  return result
 }
