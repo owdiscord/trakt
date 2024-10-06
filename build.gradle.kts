@@ -16,6 +16,11 @@ repositories {
     maven("https://oss.sonatype.org/content/repositories/snapshots")
 }
 
+java {
+    sourceCompatibility = JavaVersion.VERSION_21
+    targetCompatibility = JavaVersion.VERSION_21
+}
+
 dependencies {
     testImplementation(kotlin("test"))
     implementation("dev.kord:kord-core:0.14.0")
@@ -36,7 +41,7 @@ tasks.test {
 }
 
 tasks.withType<KotlinCompile> {
-    kotlinOptions.jvmTarget = "1.8"
+    kotlinOptions.jvmTarget = "21"
 }
 
 application {

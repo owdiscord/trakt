@@ -52,7 +52,7 @@ fun messageScoreForUser(snowflake: ULong): Int {
  * Write the cached list of message score progress to DB. Return a list of users who now qualify for award as a result
  * of this change.
  */
-fun writeProgress(userScores: List<ProgressManager.Progress>): List<ULong> {
+fun writeProgress(userScores: Collection<ProgressManager.Progress>): List<ULong> {
   val result = ArrayList<ULong>()
   transaction {
     for (userScore in userScores) {

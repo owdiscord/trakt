@@ -1,12 +1,10 @@
 package com.trakt.core
 
 import com.trakt.data.messageScoreForUser
-import kotlinx.coroutines.Dispatchers
+import com.trakt.data.writeProgress
+import kotlinx.coroutines.*
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.channels.consume
-import kotlinx.coroutines.coroutineScope
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
 import java.util.concurrent.ConcurrentHashMap
 import kotlin.concurrent.Volatile
 import kotlin.time.*
@@ -51,6 +49,12 @@ class ProgressManager {
           pendingProgress.getOrCreate(user).credit()
         }
       }
+      launch {
+        while (true) {
+          delay(PROGRESS_WRITE_PERIOD)
+          reportAllProgress()
+        }
+      }
     }
     return this
   }
@@ -60,14 +64,20 @@ class ProgressManager {
     progressChannel.trySend(user)
   }
 
-  fun reportAllProgress() {
+  private suspend fun reportAllProgress() {
     val now = timeSource.markNow()
-    pendingProgress.entries.removeAll { now - it.value.lastCredit > PROGRESS_DELAY }
+    coroutineScope {
+      launch(Dispatchers.IO) {
+        writeProgress(pendingProgress.values)
+        pendingProgress.entries.removeAll { now - it.value.lastCredit > PROGRESS_DELAY }
+      }
+    }
   }
 
   companion object {
     const val TIME_SCORE_THRESHOLD = 14
     const val MESSAGE_SCORE_THRESHOLD = 560
+    private val PROGRESS_WRITE_PERIOD: Duration = 300.seconds
     private val PROGRESS_DELAY: Duration = 900.seconds
     private val timeSource = TimeSource.Monotonic
   }

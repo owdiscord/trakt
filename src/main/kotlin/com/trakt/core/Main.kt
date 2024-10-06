@@ -20,13 +20,18 @@ suspend fun main(args: Array<String>) {
 
   initUserRepository()
 
-  val bot = Kord("hi")
+  val bot = Kord("MTI5MjU4NDUyNzg0NzQ4OTU3OQ.GwK1Ai.t6L7rS-zArLu-tqilDqyXakd-npk9YxDmtcBUE")
 
   val progressManager = ProgressManager().startCollection()
 
-  bot.on<MessageCreateEvent> { processMessage(this, progressManager) }
+  bot.on<MessageCreateEvent> {
+    if (member?.isBot != false) return@on
+    member?.id?.also { progressManager.submitProgress(it.value) }
+  }
 
   bot.on<BanAddEvent> {  }
 
   bot.on<MemberJoinEvent> {  }
+
+  bot.login()
 }
