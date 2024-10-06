@@ -1,16 +1,19 @@
 package com.trakt.core
 
-import com.trakt.data.messageScoreForUser
-import com.trakt.data.writeProgress
-import kotlinx.coroutines.*
+import com.trakt.data.UserRepository
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.channels.Channel
-import kotlinx.coroutines.channels.consume
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import java.util.concurrent.ConcurrentHashMap
 import kotlin.concurrent.Volatile
-import kotlin.time.*
+import kotlin.time.ComparableTimeMark
+import kotlin.time.Duration
 import kotlin.time.Duration.Companion.seconds
+import kotlin.time.TimeSource
 
-class ProgressManager {
+class ProgressManager(private val repository: UserRepository) {
   inner class Progress(val snowflake: ULong, messageScore: Int = 0) {
     var messageScore: Int
       private set
@@ -37,7 +40,7 @@ class ProgressManager {
 
   private val pendingProgress = object : ConcurrentHashMap<ULong, Progress>() {
     fun getOrCreate(key: ULong): Progress {
-      return super.get(key) ?: Progress(key, messageScoreForUser(key)).also { super.put(key, it) }
+      return super.get(key) ?: Progress(key, repository.messageScoreForUser(key)).also { super.put(key, it) }
     }
   }
 
@@ -68,7 +71,7 @@ class ProgressManager {
     val now = timeSource.markNow()
     coroutineScope {
       launch(Dispatchers.IO) {
-        writeProgress(pendingProgress.values)
+        repository.writeProgress(pendingProgress.values)
         pendingProgress.entries.removeAll { now - it.value.lastCredit > PROGRESS_DELAY }
       }
     }
