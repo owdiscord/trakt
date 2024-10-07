@@ -1,7 +1,6 @@
 package com.trakt.core
 
 import com.trakt.data.UserRepository
-import dev.kord.common.entity.Snowflake
 import dev.kord.core.Kord
 import dev.kord.core.behavior.MemberBehavior
 import dev.kord.core.behavior.RoleBehavior
@@ -31,17 +30,18 @@ class ProgressManager(
 
     fun credit(): Boolean {
       val now = timeSource.markNow()
-      if (now - lastCredit < PROGRESS_DELAY) {
+      if (now - lastCredit < config.messageTimeout) {
         println("user $snowflake in timeout")
         return false
       }
       messageScore++
       lastCredit = now
+      println("user $snowflake now at $messageScore")
       return true
     }
 
     fun decay() {
-      messageScore -= MESSAGE_SCORE_DECAY
+      messageScore -= config.messageDecayMagnitude
     }
 
     override fun toString(): String {
@@ -52,87 +52,87 @@ class ProgressManager(
   private val progressChannel = Channel<ULong>(Channel.UNLIMITED)
   private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
-  private val pendingProgress = ConcurrentHashMap<ULong, Progress>()
-  private lateinit var knownRegulars: Set<ULong>
+  private val cachedProgress = ConcurrentHashMap<ULong, Progress>()
+  private lateinit var knownAwards: MutableSet<ULong>
 
   fun startCollection(): ProgressManager {
     scope.launch {
-      knownRegulars = repository.loadAwardUsers()
+      knownAwards = repository.loadAwardUsers()
       for (user in progressChannel) {
-        if (user in knownRegulars) continue
-        val progress = pendingProgress[user]
+        if (user in knownAwards) continue
+        val progress = cachedProgress[user]
         if (progress != null) {
           progress.credit()
         } else {
           // if we didn't have them in memory they can't have been in timeout, so unconditionally
           // credit them
-          pendingProgress[user] = Progress(user, repository.messageScoreForUser(user) + 1)
+          cachedProgress[user] = Progress(user, repository.messageScoreForUser(user) + 1)
         }
       }
     }
     scope.launch {
       while (true) {
-        delay(PROGRESS_WRITE_PERIOD)
-        reportAllProgress()
+        delay(config.progressSavePeriod)
+        saveProgress()
       }
     }
     scope.launch {
       while (true) {
-        delay(AWARD_CHECK_PERIOD)
-        processAwards()
+        delay(config.timeScorePeriod)
+        timeScoreTick()
       }
     }
     scope.launch {
       while (true) {
-        delay(DECAY_PERIOD)
+        delay(config.messageDecayPeriod)
         doDecay()
       }
     }
     return this
   }
 
-  private suspend fun processAwards() {
-    val newAwardUsers = repository.addTimeScore()
+  private suspend fun awardAndCommit(newAwardUsers: List<ULong>) {
     val guild = config.guild.snowflake
     val role = config.role.snowflake
     val roleName = RoleBehavior(config.guild.snowflake, config.role.snowflake, kord).asRole().name
     for (awardUser in newAwardUsers) {
       MemberBehavior(guild, awardUser.snowflake, kord)
-          .addRole(role, "Automatic $roleName award")
+        .addRole(role, "Automatic $roleName award")
+      println("granted $awardUser $roleName")
       repository.commitAwardGrant(awardUser)
+      knownAwards.add(awardUser)
     }
+  }
+
+  private suspend fun timeScoreTick() {
+    println("running time tick")
+    awardAndCommit(repository.addTimeScore())
   }
 
   private fun doDecay() {
     val removedUsers = repository.dockMessageScore()
-    pendingProgress.entries.removeAll { it.key in removedUsers }
-    pendingProgress.values.forEach { it.decay() }
+    cachedProgress.entries.removeAll { it.key in removedUsers }
+    cachedProgress.values.forEach { it.decay() }
   }
 
   fun submitProgress(user: ULong) {
-    println("attempting to credit user $user")
     progressChannel.trySend(user)
   }
 
-  private fun reportAllProgress() {
+  /**
+   * Write our cache of progress to disk and award regular to users who now qualify.
+   */
+  private suspend fun saveProgress() {
     val now = timeSource.markNow()
     println("all cached user progress:")
-    pendingProgress.values.forEach { println(it) }
-    repository.writeProgress(pendingProgress.values)
+    cachedProgress.values.forEach { println(it) }
+    awardAndCommit(repository.writeMessageScore(cachedProgress.values))
     // no need to keep users in memory beyond PROGRESS_DELAY, since their next message is guaranteed
     // to credit
-    pendingProgress.entries.removeAll { now - it.value.lastCredit > PROGRESS_DELAY }
+    cachedProgress.entries.removeAll { now - it.value.lastCredit > config.messageTimeout }
   }
 
   companion object {
-    const val TIME_SCORE_THRESHOLD = 14
-    const val MESSAGE_SCORE_TIME_THRESHOLD = 280
-    const val MESSAGE_SCORE_AWARD_THRESHOLD = 560
-    const val MESSAGE_SCORE_DECAY = 28
-    private val DECAY_PERIOD: Duration = 86400.seconds
-    private val PROGRESS_WRITE_PERIOD: Duration = 10.seconds
-    private val AWARD_CHECK_PERIOD: Duration = 10800.seconds
-    private val PROGRESS_DELAY: Duration = 30.seconds
     private val timeSource = TimeSource.Monotonic
   }
 }

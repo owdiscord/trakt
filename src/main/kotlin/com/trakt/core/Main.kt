@@ -10,15 +10,20 @@ import dev.kord.core.on
 suspend fun main(args: Array<String>) {
   println("Hello World!")
   println("Program arguments: ${args.joinToString()}")
+  if (args.isEmpty()) {
+    System.err.println("Not enough arguments")
+    return
+  }
 
-  val bot = Kord(args.first())
   val config = TraktConfig.readConfig(args[1])
+  val bot = Kord(config.token)
 
   println("created bot")
-  val progressManager = ProgressManager(bot, UserRepository(), config).startCollection()
+  val progressManager = ProgressManager(bot, UserRepository(config), config).startCollection()
 
   println("collection started")
   bot.on<MessageCreateEvent> {
+    if (guildId?.value != config.guild) return@on
     if (member?.isBot == true) return@on
     println("msg: user=${member?.id}, channel=${message.channel}")
     member?.id?.also { progressManager.submitProgress(it.value) }

@@ -1,13 +1,14 @@
 package com.trakt.data
 
 import com.trakt.core.ProgressManager
+import com.trakt.core.TraktConfig
 import org.jetbrains.exposed.sql.Database
 import org.jetbrains.exposed.sql.SchemaUtils
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
 import org.jetbrains.exposed.sql.and
 import org.jetbrains.exposed.sql.transactions.transaction
 
-class UserRepository {
+class UserRepository(private val config: TraktConfig) {
 
   init {
     Database.connect("jdbc:h2:mem:test;DB_CLOSE_DELAY=-1")
@@ -21,23 +22,32 @@ class UserRepository {
     }
   }
 
+  private fun qualifies(user: UserEntity): Boolean {
+    return user.messageScore >= config.messageAwardThreshold && user.timeScore >= config.timeAwardThreshold
+  }
+
   /**
    * Write the cached list of message score progress to DB. Return a list of users who now qualify
    * for award as a result of this change.
    */
-  fun writeProgress(userScores: Collection<ProgressManager.Progress>): List<ULong> {
+  fun writeMessageScore(userScores: Collection<ProgressManager.Progress>): List<ULong> {
     val result = ArrayList<ULong>()
     transaction {
       for (userScore in userScores) {
         UserEntity.findSingleByAndUpdate(UsersTable.snowflake eq userScore.snowflake) {
           it.messageScore = userScore.messageScore
-          if (it.qualifies) {
+          if (qualifies(it)) {
             result.add(it.snowflake)
           }
         }
             ?: UserEntity.new {
               snowflake = userScore.snowflake
               messageScore = userScore.messageScore
+            }.also {
+              // unlikely, but possible with certain configuration choices
+              if (qualifies(it)) {
+                result.add(userScore.snowflake)
+              }
             }
       }
     }
@@ -53,11 +63,13 @@ class UserRepository {
     transaction {
       for (user in
           UserEntity.find {
-            (UsersTable.timeScore less ProgressManager.TIME_SCORE_THRESHOLD) and
-                (UsersTable.messageScore greater ProgressManager.MESSAGE_SCORE_TIME_THRESHOLD)
+            (UsersTable.hasAward eq false) and
+                (UsersTable.timeScore less config.timeAwardThreshold) and
+                (UsersTable.messageScore greater config.timeTrackingMessageThreshold)
           }) {
         user.timeScore++
-        if (user.qualifies) {
+        println("user $user time score is now ${user.timeScore}")
+        if (qualifies(user)) {
           result.add(user.snowflake)
         }
       }
@@ -73,12 +85,12 @@ class UserRepository {
     val result = mutableSetOf<ULong>()
     transaction {
       for (user in UserEntity.all()) {
-        if (user.messageScore <= ProgressManager.MESSAGE_SCORE_DECAY) {
+        if (user.messageScore <= config.messageDecayMagnitude) {
           result.add(user.snowflake)
           user.delete()
           continue
         }
-        user.messageScore -= ProgressManager.MESSAGE_SCORE_DECAY
+        user.messageScore -= config.messageDecayMagnitude
       }
     }
     return result
@@ -90,10 +102,12 @@ class UserRepository {
     }
   }
 
-  fun loadAwardUsers(): Set<ULong> {
+  fun loadAwardUsers(): MutableSet<ULong> {
     val result = mutableSetOf<ULong>()
-    for (user in UserEntity.find { UsersTable.hasAward eq true }) {
-      result.add(user.snowflake)
+    transaction {
+      for (user in UserEntity.find { UsersTable.hasAward eq true }) {
+        result.add(user.snowflake)
+      }
     }
     return result
   }

@@ -1,6 +1,5 @@
 package com.trakt.data
 
-import com.trakt.core.ProgressManager
 import org.jetbrains.exposed.dao.IntEntity
 import org.jetbrains.exposed.dao.IntEntityClass
 import org.jetbrains.exposed.dao.id.EntityID
@@ -20,8 +19,4 @@ class UserEntity(id: EntityID<Int>) : IntEntity(id) {
   var messageScore by UsersTable.messageScore
   var timeScore by UsersTable.timeScore
   var hasAward by UsersTable.hasAward
-
-  val qualifies: Boolean
-    get() = timeScore >= ProgressManager.TIME_SCORE_THRESHOLD &&
-      messageScore >= ProgressManager.MESSAGE_SCORE_AWARD_THRESHOLD
 }
