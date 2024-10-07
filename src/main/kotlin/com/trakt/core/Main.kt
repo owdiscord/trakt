@@ -2,8 +2,6 @@ package com.trakt.core
 
 import com.trakt.data.UserRepository
 import dev.kord.core.Kord
-import dev.kord.core.event.guild.BanAddEvent
-import dev.kord.core.event.guild.MemberJoinEvent
 import dev.kord.core.event.message.MessageCreateEvent
 import dev.kord.core.on
 
