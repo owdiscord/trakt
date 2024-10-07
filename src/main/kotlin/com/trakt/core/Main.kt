@@ -11,10 +11,11 @@ suspend fun main(args: Array<String>) {
   println("Hello World!")
   println("Program arguments: ${args.joinToString()}")
 
-  val bot = Kord("MTI5MjU4NDUyNzg0NzQ4OTU3OQ.GwK1Ai.t6L7rS-zArLu-tqilDqyXakd-npk9YxDmtcBUE")
+  val bot = Kord(args.first())
+  val config = TraktConfig.readConfig(args[1])
 
   println("created bot")
-  val progressManager = ProgressManager(UserRepository()).startCollection()
+  val progressManager = ProgressManager(bot, UserRepository(), config).startCollection()
 
   println("collection started")
   bot.on<MessageCreateEvent> {

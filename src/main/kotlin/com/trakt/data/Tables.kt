@@ -10,7 +10,7 @@ object UsersTable : IntIdTable() {
   val snowflake = ulong("snowflake").index()
   val messageScore = integer("message_score").default(1)
   val timeScore = integer("time_score").default(0)
-  val hasRegular = bool("has_regular").default(false)
+  val hasAward = bool("has_regular").default(false)
 }
 
 class UserEntity(id: EntityID<Int>) : IntEntity(id) {
@@ -19,10 +19,9 @@ class UserEntity(id: EntityID<Int>) : IntEntity(id) {
   var snowflake by UsersTable.snowflake
   var messageScore by UsersTable.messageScore
   var timeScore by UsersTable.timeScore
-  var hasRegular by UsersTable.hasRegular
+  var hasAward by UsersTable.hasAward
 
   val qualifies: Boolean
     get() = timeScore >= ProgressManager.TIME_SCORE_THRESHOLD &&
-      messageScore >= ProgressManager.MESSAGE_SCORE_THRESHOLD
-
+      messageScore >= ProgressManager.MESSAGE_SCORE_AWARD_THRESHOLD
 }
