@@ -4,13 +4,11 @@ import com.trakt.data.UserRepository
 import dev.kord.core.Kord
 import dev.kord.core.behavior.MemberBehavior
 import dev.kord.core.behavior.RoleBehavior
-import java.util.concurrent.ConcurrentHashMap
-import kotlin.time.ComparableTimeMark
-import kotlin.time.Duration
-import kotlin.time.Duration.Companion.seconds
-import kotlin.time.TimeSource
 import kotlinx.coroutines.*
 import kotlinx.coroutines.channels.Channel
+import java.util.concurrent.ConcurrentHashMap
+import kotlin.time.ComparableTimeMark
+import kotlin.time.TimeSource
 
 class ProgressManager(
     private val kord: Kord,
@@ -96,8 +94,7 @@ class ProgressManager(
     val role = config.role.snowflake
     val roleName = RoleBehavior(config.guild.snowflake, config.role.snowflake, kord).asRole().name
     for (awardUser in newAwardUsers) {
-      MemberBehavior(guild, awardUser.snowflake, kord)
-        .addRole(role, "Automatic $roleName award")
+      MemberBehavior(guild, awardUser.snowflake, kord).addRole(role, "Automatic $roleName award")
       println("granted $awardUser $roleName")
       repository.commitAwardGrant(awardUser)
       knownAwards.add(awardUser)
@@ -119,9 +116,7 @@ class ProgressManager(
     progressChannel.trySend(user)
   }
 
-  /**
-   * Write our cache of progress to disk and award regular to users who now qualify.
-   */
+  /** Write our cache of progress to disk and award regular to users who now qualify. */
   private suspend fun saveProgress() {
     val now = timeSource.markNow()
     println("all cached user progress:")
