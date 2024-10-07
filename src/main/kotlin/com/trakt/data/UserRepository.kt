@@ -23,7 +23,8 @@ class UserRepository(private val config: TraktConfig) {
   }
 
   private fun qualifies(user: UserEntity): Boolean {
-    return user.messageScore >= config.messageAwardThreshold && user.timeScore >= config.timeAwardThreshold
+    return user.messageScore >= config.messageAwardThreshold &&
+        user.timeScore >= config.timeAwardThreshold
   }
 
   /**
@@ -41,14 +42,15 @@ class UserRepository(private val config: TraktConfig) {
           }
         }
             ?: UserEntity.new {
-              snowflake = userScore.snowflake
-              messageScore = userScore.messageScore
-            }.also {
-              // unlikely, but possible with certain configuration choices
-              if (qualifies(it)) {
-                result.add(userScore.snowflake)
-              }
-            }
+                  snowflake = userScore.snowflake
+                  messageScore = userScore.messageScore
+                }
+                .also {
+                  // unlikely, but possible with certain configuration choices
+                  if (qualifies(it)) {
+                    result.add(userScore.snowflake)
+                  }
+                }
       }
     }
     return result

@@ -29,10 +29,6 @@ suspend fun main(args: Array<String>) {
     member?.id?.also { progressManager.submitProgress(it.value) }
   }
 
-  bot.on<BanAddEvent> {  }
-
-  bot.on<MemberJoinEvent> {  }
-
   println("doing login")
   bot.login()
 }
