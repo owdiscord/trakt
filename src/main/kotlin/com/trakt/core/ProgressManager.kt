@@ -4,11 +4,11 @@ import com.trakt.data.UserRepository
 import dev.kord.core.Kord
 import dev.kord.core.behavior.MemberBehavior
 import dev.kord.core.behavior.RoleBehavior
-import kotlinx.coroutines.*
-import kotlinx.coroutines.channels.Channel
 import java.util.concurrent.ConcurrentHashMap
 import kotlin.time.ComparableTimeMark
 import kotlin.time.TimeSource
+import kotlinx.coroutines.*
+import kotlinx.coroutines.channels.Channel
 
 class ProgressManager(
     private val kord: Kord,
@@ -29,21 +29,15 @@ class ProgressManager(
     fun credit(): Boolean {
       val now = timeSource.markNow()
       if (now - lastCredit < config.messageTimeout) {
-        println("user $snowflake in timeout")
         return false
       }
       messageScore++
       lastCredit = now
-      println("user $snowflake now at $messageScore")
       return true
     }
 
     fun decay() {
       messageScore -= config.messageDecayMagnitude
-    }
-
-    override fun toString(): String {
-      return "User=$snowflake, message score=$messageScore, last credit time=$lastCredit"
     }
   }
 
@@ -92,10 +86,21 @@ class ProgressManager(
   private suspend fun awardAndCommit(newAwardUsers: List<ULong>) {
     val guild = config.guild.snowflake
     val role = config.role.snowflake
-    val roleName = RoleBehavior(config.guild.snowflake, config.role.snowflake, kord).asRole().name
+    val roleName = RoleBehavior(guild, role, kord).asRole().name
     for (awardUser in newAwardUsers) {
       MemberBehavior(guild, awardUser.snowflake, kord).addRole(role, "Automatic $roleName award")
       println("granted $awardUser $roleName")
+      repository.commitAwardGrant(awardUser)
+      knownAwards.add(awardUser)
+    }
+  }
+
+  private suspend fun stripAward(users: Collection<ULong>) {
+    val guild = config.guild.snowflake
+    val role = config.role.snowflake
+    val roleName = RoleBehavior(guild, role, kord).asRole().name
+    for (awardUser in users) {
+      MemberBehavior(guild, awardUser.snowflake, kord).removeRole(role, "Automatic $roleName strip")
       repository.commitAwardGrant(awardUser)
       knownAwards.add(awardUser)
     }
@@ -106,9 +111,10 @@ class ProgressManager(
     awardAndCommit(repository.addTimeScore())
   }
 
-  private fun doDecay() {
-    val removedUsers = repository.dockMessageScore()
-    cachedProgress.entries.removeAll { it.key in removedUsers }
+  private suspend fun doDecay() {
+    val decayResult = repository.dockMessageScore()
+    stripAward(decayResult.inactiveAwardUsers)
+    cachedProgress.entries.removeAll { it.key in decayResult.totalUsers }
     cachedProgress.values.forEach { it.decay() }
   }
 
@@ -122,7 +128,7 @@ class ProgressManager(
     println("all cached user progress:")
     cachedProgress.values.forEach { println(it) }
     awardAndCommit(repository.writeMessageScore(cachedProgress.values))
-    // no need to keep users in memory beyond PROGRESS_DELAY, since their next message is guaranteed
+    // no need to keep users in memory beyond messageTimeout, since their next message is guaranteed
     // to credit
     cachedProgress.entries.removeAll { now - it.value.lastCredit > config.messageTimeout }
   }

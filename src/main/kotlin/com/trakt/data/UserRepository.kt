@@ -15,6 +15,8 @@ class UserRepository(private val config: TraktConfig) {
     transaction { SchemaUtils.create(UsersTable) }
   }
 
+  class DecayResult(val inactiveAwardUsers: Set<ULong>, val totalUsers: Set<ULong>)
+
   /** Load this user's message score from the repository, or 0 if we don't know them. */
   fun messageScoreForUser(snowflake: ULong): Int {
     return transaction {
@@ -83,11 +85,15 @@ class UserRepository(private val config: TraktConfig) {
    * Perform periodic decay of user message scores. Any users whose score would reach zero via this
    * mechanism are deleted from the database, and their snowflake is added to the returned set.
    */
-  fun dockMessageScore(): Set<ULong> {
+  fun dockMessageScore(): DecayResult {
     val result = mutableSetOf<ULong>()
+    val awardResult = mutableSetOf<ULong>()
     transaction {
       for (user in UserEntity.all()) {
         if (user.messageScore <= config.messageDecayMagnitude) {
+          if (user.hasAward) {
+            awardResult.add(user.snowflake)
+          }
           result.add(user.snowflake)
           user.delete()
           continue
@@ -95,12 +101,18 @@ class UserRepository(private val config: TraktConfig) {
         user.messageScore -= config.messageDecayMagnitude
       }
     }
-    return result
+    return DecayResult(awardResult, result)
   }
 
   fun commitAwardGrant(user: ULong) {
     transaction {
       UserEntity.findSingleByAndUpdate(UsersTable.snowflake eq user) { it.hasAward = true }
+    }
+  }
+
+  fun commitAwardStrip(user: ULong) {
+    transaction {
+      UserEntity.findSingleByAndUpdate(UsersTable.snowflake eq user) { it.hasAward = false }
     }
   }
 
