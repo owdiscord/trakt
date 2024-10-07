@@ -115,14 +115,4 @@ class UserRepository(private val config: TraktConfig) {
       UserEntity.findSingleByAndUpdate(UsersTable.snowflake eq user) { it.hasAward = false }
     }
   }
-
-  fun loadAwardUsers(): MutableSet<ULong> {
-    val result = mutableSetOf<ULong>()
-    transaction {
-      for (user in UserEntity.find { UsersTable.hasAward eq true }) {
-        result.add(user.snowflake)
-      }
-    }
-    return result
-  }
 }
