@@ -13,11 +13,13 @@ suspend fun main(args: Array<String>) {
     return
   }
 
-  val config = TraktConfig.readConfig(args[1])
+  val config = TraktConfig.readConfig(args[0])
   val bot = Kord(config.token)
 
   println("created bot")
-  val progressManager = ProgressManager(bot, UserRepository(config), config).startCollection()
+  val userRepository = UserRepository(config)
+  val progressManager = ProgressManager(bot, userRepository, config).startCollection()
+  val commandManager = CommandManager(bot, progressManager, userRepository, config)
 
   println("collection started")
   bot.on<MessageCreateEvent> {
@@ -26,6 +28,8 @@ suspend fun main(args: Array<String>) {
     println("msg: user=${member?.id}, channel=${message.channel}")
     member?.id?.also { progressManager.submitProgress(it.value) }
   }
+
+  commandManager.setupCommands()
 
   println("doing login")
   bot.login()

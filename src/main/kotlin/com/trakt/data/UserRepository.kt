@@ -18,9 +18,16 @@ class UserRepository(private val config: TraktConfig) {
   class DecayResult(val inactiveAwardUsers: Set<ULong>, val totalUsers: Set<ULong>)
 
   /** Load this user's message score from the repository, or 0 if we don't know them. */
-  fun messageScoreForUser(snowflake: ULong): Int {
+  fun messageScoreForUser(snowflake: ULong): Long {
     return transaction {
       UserEntity.find { UsersTable.snowflake eq snowflake }.firstOrNull()?.messageScore ?: 0
+    }
+  }
+
+  /** Load this user's time score from the repository, or 0 if we don't know them. */
+  fun timeScoreForUser(snowflake: ULong): Long {
+    return transaction {
+      UserEntity.find { UsersTable.snowflake eq snowflake }.firstOrNull()?.timeScore ?: 0
     }
   }
 
@@ -72,13 +79,18 @@ class UserRepository(private val config: TraktConfig) {
                 (UsersTable.messageScore greater config.timeTrackingMessageThreshold)
           }) {
         user.timeScore++
-        println("user $user time score is now ${user.timeScore}")
         if (qualifies(user)) {
           result.add(user.snowflake)
         }
       }
     }
     return result
+  }
+
+  fun overrideTimeScore(user: ULong, value: Long) {
+    transaction {
+      UserEntity.findSingleByAndUpdate(UsersTable.snowflake eq user) { it.timeScore = value }
+    }
   }
 
   /**

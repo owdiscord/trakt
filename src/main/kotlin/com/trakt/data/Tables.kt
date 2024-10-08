@@ -7,8 +7,8 @@ import org.jetbrains.exposed.dao.id.IntIdTable
 
 object UsersTable : IntIdTable() {
   val snowflake = ulong("snowflake").index()
-  val messageScore = integer("message_score").default(1)
-  val timeScore = integer("time_score").default(0)
+  val messageScore = long("message_score").default(1)
+  val timeScore = long("time_score").default(0)
   val hasAward = bool("has_regular").default(false)
 }
 

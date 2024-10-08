@@ -15,8 +15,8 @@ class ProgressManager(
     private val repository: UserRepository,
     private val config: TraktConfig
 ) {
-  inner class Progress(val snowflake: ULong, messageScore: Int) {
-    var messageScore: Int
+  inner class Progress(val snowflake: ULong, messageScore: Long) {
+    var messageScore: Long
       private set
 
     var lastCredit: ComparableTimeMark = timeSource.markNow()
@@ -38,6 +38,11 @@ class ProgressManager(
       return true
     }
 
+    fun override(value: Long) {
+      messageScore = value
+      lastCredit = timeSource.markNow()
+    }
+
     fun decay() {
       messageScore -= config.messageDecayMagnitude
     }
@@ -45,8 +50,20 @@ class ProgressManager(
 
   private val progressChannel = Channel<ULong>(Channel.UNLIMITED)
   private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
-
   private val cachedProgress = ConcurrentHashMap<ULong, Progress>()
+
+  fun messageScoreForUser(user: ULong) = cachedProgress[user]?.messageScore
+
+  fun overrideMessageScore(user: ULong, value: Long) {
+    val progress = cachedProgress[user]
+    if (progress != null) {
+      progress.override(value)
+    } else {
+      // if we didn't have them in memory they can't have been in timeout, so unconditionally
+      // credit them
+      cachedProgress[user] = Progress(user, value)
+    }
+  }
 
   fun startCollection(): ProgressManager {
     scope.launch {
@@ -88,7 +105,6 @@ class ProgressManager(
     val roleName = RoleBehavior(guild, role, kord).asRole().name
     for (awardUser in users) {
       MemberBehavior(guild, awardUser.snowflake, kord).addRole(role, "Automatic $roleName award")
-      println("granted $awardUser $roleName")
       repository.commitAwardGrant(awardUser)
     }
   }
@@ -104,7 +120,6 @@ class ProgressManager(
   }
 
   private suspend fun timeScoreTick() {
-    println("running time tick")
     grantAward(repository.addTimeScore())
   }
 
@@ -122,8 +137,6 @@ class ProgressManager(
   /** Write our cache of progress to disk and award regular to users who now qualify. */
   private suspend fun saveProgress() {
     val now = timeSource.markNow()
-    println("all cached user progress:")
-    cachedProgress.values.forEach { println(it) }
     grantAward(repository.writeMessageScore(cachedProgress.values))
     // no need to keep users in memory beyond messageTimeout, since their next message is guaranteed
     // to credit

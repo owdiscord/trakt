@@ -11,14 +11,14 @@ data class TraktConfig(
     val guild: ULong,
     val role: ULong,
     /** Required message score for award. */
-    val messageAwardThreshold: Int,
+    val messageAwardThreshold: Long,
     /** Required message score before we begin tracking time for this user. */
-    val timeTrackingMessageThreshold: Int,
+    val timeTrackingMessageThreshold: Long,
     /**
      * Required time score for award. Not tracked until user message score is above
      * [timeTrackingMessageThreshold]
      */
-    val timeAwardThreshold: Int,
+    val timeAwardThreshold: Long,
     /** Value of message score deducted at regular intervals. */
     val messageDecayMagnitude: Int,
     /** Interval at which to perform message score decay. */
