@@ -26,7 +26,7 @@ class CommandManager(
           "view" to ::handleView, "edit" to ::handleEdit)
 
   suspend fun setupCommands() {
-    kord.createGuildChatInputCommand(config.guild.snowflake, "trakt", "Interact with Trakt") {
+    kord.createGuildChatInputCommand(config.guild.snowflake, "trakt", "Interact with trakt") {
       subCommand("view", "View user award progress") {
         string("score_type", "Score type to view") {
           required = true
@@ -35,7 +35,7 @@ class CommandManager(
         }
         string("snowflake", "User ID") { required = true }
       }
-      subCommand("edit", "View user award progress") {
+      subCommand("edit", "Edit user award progress") {
         string("score_type", "Score type to view") {
           required = true
           choice("Message score", "message_score")
@@ -55,7 +55,6 @@ class CommandManager(
             is GroupCommand -> command.groupName
             is RootCommand -> command.rootName
           }
-      println("command: $name")
       val responseContent = handlers[name]?.invoke(command) ?: ERROR_RESPONSE_CONTENT
       response.respond { content = responseContent }
     }
@@ -85,7 +84,6 @@ class CommandManager(
 
   private suspend fun handleView(command: InteractionCommand): String? {
     val snowflake = command.strings["snowflake"]?.toULong() ?: return null
-    println("command snowflake is $snowflake")
     val score =
         when (command.strings["score_type"]) {
           "message_score" ->
@@ -102,7 +100,6 @@ class CommandManager(
   private suspend fun handleEdit(command: InteractionCommand): String? {
     val snowflake = command.strings["snowflake"]?.toULong() ?: return null
     val overrideValue = command.integers["override"] ?: return null
-    println("command snowflake is $snowflake")
     when (command.strings["score_type"]) {
       "message_score" -> progressManager.overrideMessageScore(snowflake, overrideValue)
       "time_score" -> userRepository.overrideTimeScore(snowflake, overrideValue)
