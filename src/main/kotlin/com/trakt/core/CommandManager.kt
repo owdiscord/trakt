@@ -42,7 +42,7 @@ class CommandManager(
           choice("Time score", "time_score")
         }
         string("snowflake", "User ID") { required = true }
-        integer("override", "Override value") { required = true}
+        integer("override", "Override value") { required = true }
       }
     }
 
