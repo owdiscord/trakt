@@ -4,11 +4,14 @@ import com.trakt.data.UserRepository
 import dev.kord.core.Kord
 import dev.kord.core.behavior.MemberBehavior
 import dev.kord.core.behavior.RoleBehavior
-import kotlinx.coroutines.*
-import kotlinx.coroutines.channels.Channel
+import dev.kord.core.entity.Embed
 import java.util.concurrent.ConcurrentHashMap
 import kotlin.time.ComparableTimeMark
+import kotlin.time.Duration
 import kotlin.time.TimeSource
+import kotlinx.coroutines.*
+import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.selects.select
 
 class ProgressManager(
     private val kord: Kord,
@@ -48,7 +51,10 @@ class ProgressManager(
     }
   }
 
+  data class Penalty(val user: ULong, val delay: Duration)
+
   private val progressChannel = Channel<ULong>(Channel.UNLIMITED)
+  private val sanctionChannel = Channel<Penalty>(Channel.UNLIMITED)
   private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
   private val cachedProgress = ConcurrentHashMap<ULong, Progress>()
 
@@ -67,6 +73,22 @@ class ProgressManager(
 
   fun startCollection(): ProgressManager {
     scope.launch {
+      while (true) {
+        select<Unit> {
+          progressChannel.onReceive { user ->
+            val progress = cachedProgress[user]
+            if (progress != null) {
+              progress.credit()
+            } else {
+              // if we didn't have them in memory they can't have been in timeout, so
+              // unconditionally
+              // credit them
+              cachedProgress[user] = Progress(user, repository.messageScoreForUser(user) + 1)
+            }
+          }
+          sanctionChannel.onReceive { penalty -> }
+        }
+      }
       for (user in progressChannel) {
         val progress = cachedProgress[user]
         if (progress != null) {
@@ -100,6 +122,9 @@ class ProgressManager(
   }
 
   private suspend fun grantAward(users: Collection<ULong>) {
+    if (users.isEmpty()) {
+      return
+    }
     val guild = config.guild.snowflake
     val role = config.role.snowflake
     val roleName = RoleBehavior(guild, role, kord).asRole().name
@@ -110,6 +135,9 @@ class ProgressManager(
   }
 
   private suspend fun stripAward(users: Collection<ULong>) {
+    if (users.isEmpty()) {
+      return
+    }
     val guild = config.guild.snowflake
     val role = config.role.snowflake
     val roleName = RoleBehavior(guild, role, kord).asRole().name
@@ -128,6 +156,23 @@ class ProgressManager(
     stripAward(decayResult.inactiveAwardUsers)
     cachedProgress.entries.removeAll { it.key in decayResult.totalUsers }
     cachedProgress.values.forEach { it.decay() }
+  }
+
+  fun submitSanction(embed: Embed) {
+    val delay =
+        when (embed.title?.split(' ')?.firstOrNull()) {
+          "BAN" -> config.banDelay
+          "MUTE" -> config.muteDelay
+          "WARN" -> config.warnDelay
+          else -> null
+        } ?: return
+    for (field in embed.fields) {
+      if (field.name == "User") {
+        val snowflake = Regex("<@!?(\\d+)>").find(field.value)?.groupValues?.firstOrNull() ?: return
+        sanctionChannel.trySend(Penalty(snowflake.toULong(), delay))
+        return
+      }
+    }
   }
 
   fun submitProgress(user: ULong) {

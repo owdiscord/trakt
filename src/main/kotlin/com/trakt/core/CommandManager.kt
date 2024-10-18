@@ -36,7 +36,7 @@ class CommandManager(
         string("snowflake", "User ID") { required = true }
       }
       subCommand("edit", "Edit user award progress") {
-        string("score_type", "Score type to view") {
+        string("score_type", "Score type to edit") {
           required = true
           choice("Message score", "message_score")
           choice("Time score", "time_score")
