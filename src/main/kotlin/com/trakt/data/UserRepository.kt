@@ -93,15 +93,52 @@ class UserRepository(private val config: TraktConfig) {
     }
   }
 
+  fun addWarn(user: ULong) {
+    transaction {
+      UserEntity.findSingleByAndUpdate(UsersTable.snowflake eq user) {
+        it.timeScore -= config.warnDelayPeriods
+      }
+    }
+  }
+
+  fun updateMuteStatus(user: ULong, isMuted: Boolean) {
+    transaction {
+      UserEntity.findSingleByAndUpdate(UsersTable.snowflake eq user) {
+        it.isMuted = isMuted
+        if (isMuted) {
+          it.messageScore = 0
+          it.timeScore = -config.muteDelayPeriods
+        }
+      }
+    }
+  }
+
+  fun updateBanStatus(user: ULong, isBanned: Boolean) {
+    transaction {
+      UserEntity.findSingleByAndUpdate(UsersTable.snowflake eq user) {
+        it.isBanned = isBanned
+        if (isBanned) {
+          it.messageScore = 0
+          it.timeScore = -config.banDelayPeriods
+        }
+      }
+    }
+  }
+
   /**
    * Perform periodic decay of user message scores. Any users whose score would reach zero via this
-   * mechanism are deleted from the database, and their snowflake is added to the returned set.
+   * mechanism are deleted from the database (unless they are muted or banned), and their snowflake is added to the
+   * returned set.
    */
   fun dockMessageScore(): DecayResult {
     val result = mutableSetOf<ULong>()
     val awardResult = mutableSetOf<ULong>()
     transaction {
       for (user in UserEntity.all()) {
+        if (user.isBanned || user.isMuted) {
+          // don't allow users to wipe their slate clean early by simply not talking
+          continue
+        }
         if (user.messageScore <= config.messageDecayMagnitude) {
           if (user.hasAward) {
             awardResult.add(user.snowflake)

@@ -25,9 +25,12 @@ data class TraktConfig(
     val messageDecayPeriod: Duration,
     /** Delay before a user can gain further message score. */
     val messageTimeout: Duration,
-    val warnDelay: Duration,
-    val muteDelay: Duration,
-    val banDelay: Duration,
+    /** Number of [timeScorePeriod]s to delay a user when warned */
+    val warnDelayPeriods: Long,
+    /** Number of [timeScorePeriod]s to delay a user when muted */
+    val muteDelayPeriods: Long,
+    /** Number of [timeScorePeriod]s to delay a user when banned (nb: applies only after rejoin) */
+    val banDelayPeriods: Long,
     /** How often to advance time score for all tracked users. */
     val timeScorePeriod: Duration,
     /** How often to commit in-memory message score tracking to storage. */
