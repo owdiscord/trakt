@@ -4,18 +4,17 @@ import com.trakt.data.UserRepository
 import dev.kord.core.Kord
 import dev.kord.core.behavior.MemberBehavior
 import dev.kord.core.behavior.RoleBehavior
-import dev.kord.core.entity.Embed
-import kotlinx.coroutines.*
-import kotlinx.coroutines.channels.Channel
-import kotlinx.coroutines.selects.select
 import java.util.concurrent.ConcurrentHashMap
 import kotlin.time.ComparableTimeMark
 import kotlin.time.TimeSource
+import kotlinx.coroutines.*
+import kotlinx.coroutines.channels.Channel
 
 class ProgressManager(
     private val kord: Kord,
     private val repository: UserRepository,
-    private val config: TraktConfig
+    private val config: TraktConfig,
+    private val scope: CoroutineScope,
 ) {
   inner class Progress(val snowflake: ULong, messageScore: Long) {
     var messageScore: Long
@@ -50,18 +49,7 @@ class ProgressManager(
     }
   }
 
-  data class Penalty(val user: ULong, val actionType: ActionType)
-
-  enum class ActionType {
-    WARN,
-    MUTE,
-    BAN,
-    UNMUTE
-  }
-
   private val progressChannel = Channel<ULong>(Channel.UNLIMITED)
-  private val sanctionChannel = Channel<Penalty>(Channel.UNLIMITED)
-  private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
   private val cachedProgress = ConcurrentHashMap<ULong, Progress>()
 
   fun messageScoreForUser(user: ULong) = cachedProgress[user]?.messageScore
@@ -79,35 +67,13 @@ class ProgressManager(
 
   fun startCollection(): ProgressManager {
     scope.launch {
-      while (true) {
-        select<Unit> {
-          progressChannel.onReceive { user ->
-            val progress = cachedProgress[user]
-            if (progress != null) {
-              progress.credit()
-            } else {
-              // if we didn't have them in memory they can't have been in timeout, so
-              // unconditionally credit them
-              cachedProgress[user] = Progress(user, repository.messageScoreForUser(user) + 1)
-            }
-          }
-          sanctionChannel.onReceive { penalty ->
-            when (penalty.actionType) {
-              ActionType.BAN -> repository.updateBanStatus(penalty.user, true)
-              ActionType.MUTE -> repository.updateMuteStatus(penalty.user, true)
-              ActionType.WARN -> repository.addWarn(penalty.user)
-              ActionType.UNMUTE -> repository.updateMuteStatus(penalty.user, false)
-            }
-          }
-        }
-      }
       for (user in progressChannel) {
         val progress = cachedProgress[user]
         if (progress != null) {
           progress.credit()
         } else {
-          // if we didn't have them in memory they can't have been in timeout, so unconditionally
-          // credit them
+          // if we didn't have them in memory they can't have been in timeout, so
+          // unconditionally credit them
           cachedProgress[user] = Progress(user, repository.messageScoreForUser(user) + 1)
         }
       }
@@ -168,24 +134,6 @@ class ProgressManager(
     stripAward(decayResult.inactiveAwardUsers)
     cachedProgress.entries.removeAll { it.key in decayResult.totalUsers }
     cachedProgress.values.forEach { it.decay() }
-  }
-
-  fun submitSanction(embed: Embed) {
-    val actionType =
-        when (embed.title?.split(' ')?.firstOrNull()) {
-          "BAN" -> ActionType.BAN
-          "MUTE" -> ActionType.MUTE
-          "WARN" -> ActionType.WARN
-          "UNMUTED" -> ActionType.UNMUTE
-          else -> null
-        } ?: return
-    for (field in embed.fields) {
-      if (field.name == "User") {
-        val snowflake = Regex("<@!?(\\d+)>").find(field.value)?.groupValues?.firstOrNull() ?: return
-        sanctionChannel.trySend(Penalty(snowflake.toULong(), actionType))
-        return
-      }
-    }
   }
 
   fun submitProgress(user: ULong) {

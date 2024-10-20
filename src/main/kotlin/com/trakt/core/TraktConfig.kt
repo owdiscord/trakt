@@ -10,6 +10,7 @@ data class TraktConfig(
     val token: String,
     val guild: ULong,
     val role: ULong,
+    val sanctionChannel: ULong,
     /** Required message score for award. */
     val messageAwardThreshold: Long,
     /** Required message score before we begin tracking time for this user. */

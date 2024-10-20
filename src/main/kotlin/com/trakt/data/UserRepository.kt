@@ -127,8 +127,8 @@ class UserRepository(private val config: TraktConfig) {
 
   /**
    * Perform periodic decay of user message scores. Any users whose score would reach zero via this
-   * mechanism are deleted from the database (unless they are muted or banned), and their snowflake is added to the
-   * returned set.
+   * mechanism are deleted from the database (unless they are muted or banned), and their snowflake
+   * is added to the returned set so we can clear them from cache too.
    */
   fun dockMessageScore(): DecayResult {
     val result = mutableSetOf<ULong>()
@@ -136,7 +136,9 @@ class UserRepository(private val config: TraktConfig) {
     transaction {
       for (user in UserEntity.all()) {
         if (user.isBanned || user.isMuted) {
-          // don't allow users to wipe their slate clean early by simply not talking
+          // Don't allow users to wipe their slate clean early by simply not talking. We've already
+          // set their
+          // score to zero.
           continue
         }
         if (user.messageScore <= config.messageDecayMagnitude) {
