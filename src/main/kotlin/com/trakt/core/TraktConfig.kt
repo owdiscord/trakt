@@ -11,6 +11,7 @@ data class TraktConfig(
     val guild: ULong,
     val role: ULong,
     val sanctionChannel: ULong,
+    val announceChannel: ULong,
     /** Required message score for award. */
     val messageAwardThreshold: Long,
     /** Required message score before we begin tracking time for this user. */
@@ -36,6 +37,8 @@ data class TraktConfig(
     val timeScorePeriod: Duration,
     /** How often to commit in-memory message score tracking to storage. */
     val progressSavePeriod: Duration,
+    /** Don't actually commit role changes (but announce them still) */
+    val trialmode: Boolean,
 ) {
 
   companion object {

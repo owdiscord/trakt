@@ -137,8 +137,7 @@ class UserRepository(private val config: TraktConfig) {
       for (user in UserEntity.all()) {
         if (user.isBanned || user.isMuted) {
           // Don't allow users to wipe their slate clean early by simply not talking. We've already
-          // set their
-          // score to zero.
+          // set their score to zero.
           continue
         }
         if (user.messageScore <= config.messageDecayMagnitude) {
