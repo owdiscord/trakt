@@ -5,11 +5,11 @@ import dev.kord.core.Kord
 import dev.kord.core.behavior.MemberBehavior
 import dev.kord.core.behavior.RoleBehavior
 import dev.kord.core.behavior.channel.MessageChannelBehavior
-import kotlinx.coroutines.*
-import kotlinx.coroutines.channels.Channel
 import java.util.concurrent.ConcurrentHashMap
 import kotlin.time.ComparableTimeMark
 import kotlin.time.TimeSource
+import kotlinx.coroutines.*
+import kotlinx.coroutines.channels.Channel
 
 class ProgressManager(
     private val kord: Kord,
@@ -80,19 +80,19 @@ class ProgressManager(
       }
     }
     scope.launch {
-      while (true) {
+      while (isActive) {
         delay(config.progressSavePeriod)
         saveProgress()
       }
     }
     scope.launch {
-      while (true) {
+      while (isActive) {
         delay(config.timeScorePeriod)
         timeScoreTick()
       }
     }
     scope.launch {
-      while (true) {
+      while (isActive) {
         delay(config.messageDecayPeriod)
         doDecay()
       }
@@ -112,7 +112,8 @@ class ProgressManager(
       if (!config.trialmode) {
         repository.commitAwardGrant(awardUser)
       }
-      MessageChannelBehavior(config.announceChannel.snowflake, kord).createMessage("Granted $awardUser Regular.")
+      MessageChannelBehavior(config.announceChannel.snowflake, kord)
+          .createMessage("Granted $awardUser Regular.")
     }
   }
 
@@ -128,8 +129,8 @@ class ProgressManager(
       if (!config.trialmode) {
         repository.commitAwardStrip(awardUser)
       }
-      MessageChannelBehavior(config.announceChannel.snowflake, kord).createMessage("Removed Regular from $awardUser due to " +
-          "inactivity.")
+      MessageChannelBehavior(config.announceChannel.snowflake, kord)
+          .createMessage("Removed Regular from $awardUser due to " + "inactivity.")
     }
   }
 
