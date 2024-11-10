@@ -38,7 +38,7 @@ data class TraktConfig(
     /** How often to commit in-memory message score tracking to storage. */
     val progressSavePeriod: Duration,
     /** Don't actually commit role changes (but announce them still) */
-    val trialmode: Boolean,
+    val trialMode: Boolean,
 ) {
 
   companion object {
