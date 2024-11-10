@@ -130,7 +130,7 @@ class ProgressManager(
         repository.commitAwardStrip(awardUser)
       }
       MessageChannelBehavior(config.announceChannel.snowflake, kord)
-          .createMessage("Removed Regular from $awardUser due to " + "inactivity.")
+          .createMessage("Removed Regular from $awardUser due to inactivity.")
     }
   }
 

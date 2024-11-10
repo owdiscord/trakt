@@ -34,7 +34,7 @@ suspend fun main(args: Array<String>) {
     if (sanctionManager.maybeSanction(this)) {
       return@on
     }
-    //    member?.id?.also { progressManager.submitProgress(it.value) }
+    member?.id?.also { progressManager.submitProgress(it.value) }
   }
 
   commandManager.setupCommands()
