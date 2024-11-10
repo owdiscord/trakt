@@ -37,6 +37,7 @@ dependencies {
     implementation("org.jetbrains.exposed:exposed-money:$exposedVersion")
     implementation("org.jetbrains.exposed:exposed-spring-boot-starter:$exposedVersion")
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.3")
+    implementation("org.slf4j:slf4j-simple:2.0.16")
 }
 
 tasks.test {
