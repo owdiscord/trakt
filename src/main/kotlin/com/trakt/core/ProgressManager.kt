@@ -116,7 +116,7 @@ class ProgressManager(
         "(but not really)"
       }
       MessageChannelBehavior(config.announceChannel.snowflake, kord)
-          .createMessage("Granted $awardUser Regular. $messageSuffix")
+          .createMessage("Granted <@$awardUser> Regular. $messageSuffix")
     }
   }
 
@@ -136,7 +136,7 @@ class ProgressManager(
         "(but not really)"
       }
       MessageChannelBehavior(config.announceChannel.snowflake, kord)
-          .createMessage("Removed Regular from $awardUser due to inactivity. $messageSuffix")
+          .createMessage("Removed Regular from <@$awardUser> due to inactivity. $messageSuffix")
     }
   }
 
