@@ -48,10 +48,16 @@ tasks.jar {
     manifest {
         attributes["Main-Class"] = "com.trakt.core.MainKt"
     }
-    configurations["compileClasspath"].forEach { file: File ->
-        from(zipTree(file.absoluteFile))
-    }
-    duplicatesStrategy = DuplicatesStrategy.INCLUDE
+
+//    configurations["compileClasspath"].forEach { file: File ->
+//        from(zipTree(file.absoluteFile))
+//    }
+    from(sourceSets.main.get().output)
+    dependsOn(configurations.runtimeClasspath)
+    from({
+        configurations.runtimeClasspath.get().filter { it.name.endsWith("jar") }.map { zipTree(it) }
+    })
+    duplicatesStrategy = DuplicatesStrategy.EXCLUDE
 }
 
 tasks.withType<KotlinCompile> {
