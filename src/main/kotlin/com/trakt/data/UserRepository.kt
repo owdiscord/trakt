@@ -46,7 +46,7 @@ class UserRepository(private val config: TraktConfig) {
       for (userScore in userScores) {
         UserEntity.findSingleByAndUpdate(UsersTable.snowflake eq userScore.snowflake) {
           it.messageScore = userScore.messageScore
-          if (qualifies(it)) {
+          if (!it.hasAward && qualifies(it)) {
             result.add(it.snowflake)
           }
         }
