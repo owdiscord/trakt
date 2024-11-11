@@ -55,7 +55,7 @@ class SanctionManager(
     val actionType = ActionType.fromString(embed.title?.split(' ')?.firstOrNull()) ?: return
     for (field in embed.fields) {
       if (field.name == "User") {
-        val snowflake = Regex("<@!?(\\d+)>").find(field.value)?.groupValues?.firstOrNull() ?: return
+        val snowflake = Regex("<@!?(\\d+)>").find(field.value)?.groupValues?.getOrNull(1) ?: return
         sanctionChannel.trySend(Penalty(snowflake.toULong(), actionType))
         return
       }
