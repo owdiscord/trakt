@@ -110,11 +110,11 @@ class ProgressManager(
     for (awardUser in users) {
       val messageSuffix = if (!config.trialMode) {
         MemberBehavior(guild, awardUser.snowflake, kord).addRole(role, "Automatic $roleName award")
-        repository.commitAwardGrant(awardUser)
         ""
       } else {
         "(but not really)"
       }
+      repository.commitAwardGrant(awardUser)
       MessageChannelBehavior(config.announceChannel.snowflake, kord)
           .createMessage("Granted <@$awardUser> Regular. $messageSuffix")
     }
@@ -130,11 +130,11 @@ class ProgressManager(
     for (awardUser in users) {
       val messageSuffix = if (!config.trialMode) {
         MemberBehavior(guild, awardUser.snowflake, kord).removeRole(role, "Automatic $roleName strip")
-        repository.commitAwardStrip(awardUser)
         ""
       } else {
         "(but not really)"
       }
+      repository.commitAwardStrip(awardUser)
       MessageChannelBehavior(config.announceChannel.snowflake, kord)
           .createMessage("Removed Regular from <@$awardUser> due to inactivity. $messageSuffix")
     }
