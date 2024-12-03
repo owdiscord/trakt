@@ -14,7 +14,7 @@ suspend fun main(args: Array<String>) {
   println("Hello World!")
   println("Program arguments: ${args.joinToString()}")
   if (args.isEmpty()) {
-    System.err.println("Not enough arguments")
+    println("Not enough arguments")
     return
   }
 
