@@ -1,32 +1,46 @@
+@file:OptIn(DelicateCoroutinesApi::class, ExperimentalCoroutinesApi::class)
+
 package com.trakt.data
 
 import com.trakt.core.ProgressManager
 import com.trakt.core.TraktConfig
+import kotlinx.coroutines.DelicateCoroutinesApi
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.newSingleThreadContext
+import kotlinx.coroutines.withContext
 import org.jetbrains.exposed.sql.Database
 import org.jetbrains.exposed.sql.SchemaUtils
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
+import org.jetbrains.exposed.sql.Transaction
 import org.jetbrains.exposed.sql.and
 import org.jetbrains.exposed.sql.transactions.transaction
 
 class UserRepository(private val config: TraktConfig) {
 
   init {
-    Database.connect("jdbc:h2:mem:test;DB_CLOSE_DELAY=-1")
-    transaction { SchemaUtils.create(UsersTable) }
+    //    Database.connect("jdbc:h2:mem:test;DB_CLOSE_DELAY=-1")
+    Database.connect("jdbc:sqlite:${System.getProperty("user.home")}/trakt-db/data.db")
+    println(System.getProperty("user.dir"))
+    transaction {
+      if (SchemaUtils.listDatabases().isEmpty()) {
+        SchemaUtils.createDatabase("trakt")
+      }
+      SchemaUtils.create(UsersTable)
+    }
   }
 
   class DecayResult(val inactiveAwardUsers: Set<ULong>, val totalUsers: Set<ULong>)
 
   /** Load this user's message score from the repository, or 0 if we don't know them. */
-  fun messageScoreForUser(snowflake: ULong): Long {
-    return transaction {
+  suspend fun messageScoreForUser(snowflake: ULong): Long {
+    return safeTransaction {
       UserEntity.find { UsersTable.snowflake eq snowflake }.firstOrNull()?.messageScore ?: 0
     }
   }
 
   /** Load this user's time score from the repository, or 0 if we don't know them. */
-  fun timeScoreForUser(snowflake: ULong): Long {
-    return transaction {
+  suspend fun timeScoreForUser(snowflake: ULong): Long {
+    return safeTransaction {
       UserEntity.find { UsersTable.snowflake eq snowflake }.firstOrNull()?.timeScore ?: 0
     }
   }
@@ -40,9 +54,9 @@ class UserRepository(private val config: TraktConfig) {
    * Write the cached list of message score progress to DB. Return a list of users who now qualify
    * for award as a result of this change.
    */
-  fun writeMessageScore(userScores: Collection<ProgressManager.Progress>): List<ULong> {
+  suspend fun writeMessageScore(userScores: Collection<ProgressManager.Progress>): List<ULong> {
     val result = ArrayList<ULong>()
-    transaction {
+    safeTransaction {
       for (userScore in userScores) {
         UserEntity.findSingleByAndUpdate(UsersTable.snowflake eq userScore.snowflake) {
           it.messageScore = userScore.messageScore
@@ -69,9 +83,9 @@ class UserRepository(private val config: TraktConfig) {
    * Update all known users' time scores if they are below the threshold. Return a list of users who
    * now qualify for award as a result of this change.
    */
-  fun addTimeScore(): List<ULong> {
+  suspend fun addTimeScore(): List<ULong> {
     val result = ArrayList<ULong>()
-    transaction {
+    safeTransaction {
       for (user in
           UserEntity.find {
             (UsersTable.hasAward eq false) and
@@ -87,22 +101,22 @@ class UserRepository(private val config: TraktConfig) {
     return result
   }
 
-  fun overrideTimeScore(user: ULong, value: Long) {
-    transaction {
+  suspend fun overrideTimeScore(user: ULong, value: Long) {
+    safeTransaction {
       UserEntity.findSingleByAndUpdate(UsersTable.snowflake eq user) { it.timeScore = value }
     }
   }
 
-  fun addWarn(user: ULong) {
-    transaction {
+  suspend fun addWarn(user: ULong) {
+    safeTransaction {
       UserEntity.findSingleByAndUpdate(UsersTable.snowflake eq user) {
         it.timeScore -= config.warnDelayPeriods
       }
     }
   }
 
-  fun updateMuteStatus(user: ULong, isMuted: Boolean) {
-    transaction {
+  suspend fun updateMuteStatus(user: ULong, isMuted: Boolean) {
+    safeTransaction {
       UserEntity.findSingleByAndUpdate(UsersTable.snowflake eq user) {
         it.isMuted = isMuted
         if (isMuted) {
@@ -113,8 +127,8 @@ class UserRepository(private val config: TraktConfig) {
     }
   }
 
-  fun updateBanStatus(user: ULong, isBanned: Boolean) {
-    transaction {
+  suspend fun updateBanStatus(user: ULong, isBanned: Boolean) {
+    safeTransaction {
       UserEntity.findSingleByAndUpdate(UsersTable.snowflake eq user) {
         it.isBanned = isBanned
         if (isBanned) {
@@ -130,10 +144,10 @@ class UserRepository(private val config: TraktConfig) {
    * mechanism are deleted from the database (unless they are muted or banned), and their snowflake
    * is added to the returned set so we can clear them from cache too.
    */
-  fun dockMessageScore(): DecayResult {
+  suspend fun dockMessageScore(): DecayResult {
     val result = mutableSetOf<ULong>()
     val awardResult = mutableSetOf<ULong>()
-    transaction {
+    safeTransaction {
       for (user in UserEntity.all()) {
         if (user.isBanned || user.isMuted) {
           // Don't allow users to wipe their slate clean early by simply not talking. We've already
@@ -154,15 +168,23 @@ class UserRepository(private val config: TraktConfig) {
     return DecayResult(awardResult, result)
   }
 
-  fun commitAwardGrant(user: ULong) {
-    transaction {
+  suspend fun commitAwardGrant(user: ULong) {
+    safeTransaction {
       UserEntity.findSingleByAndUpdate(UsersTable.snowflake eq user) { it.hasAward = true }
     }
   }
 
-  fun commitAwardStrip(user: ULong) {
-    transaction {
+  suspend fun commitAwardStrip(user: ULong) {
+    safeTransaction {
       UserEntity.findSingleByAndUpdate(UsersTable.snowflake eq user) { it.hasAward = false }
     }
+  }
+
+  private suspend fun <T> safeTransaction(db: Database? = null, statement: Transaction.() -> T): T {
+    return withContext(dispatcher) { transaction(db, statement) }
+  }
+
+  companion object {
+    private val dispatcher = newSingleThreadContext("repository")
   }
 }

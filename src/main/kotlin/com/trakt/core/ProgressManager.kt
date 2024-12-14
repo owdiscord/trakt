@@ -5,11 +5,11 @@ import dev.kord.core.Kord
 import dev.kord.core.behavior.MemberBehavior
 import dev.kord.core.behavior.RoleBehavior
 import dev.kord.core.behavior.channel.MessageChannelBehavior
-import kotlinx.coroutines.*
-import kotlinx.coroutines.channels.Channel
 import java.util.concurrent.ConcurrentHashMap
 import kotlin.time.ComparableTimeMark
 import kotlin.time.TimeSource
+import kotlinx.coroutines.*
+import kotlinx.coroutines.channels.Channel
 
 class ProgressManager(
     private val kord: Kord,
@@ -108,12 +108,14 @@ class ProgressManager(
     val role = config.role.snowflake
     val roleName = RoleBehavior(guild, role, kord).asRole().name
     for (awardUser in users) {
-      val messageSuffix = if (!config.trialMode) {
-        MemberBehavior(guild, awardUser.snowflake, kord).addRole(role, "Automatic $roleName award")
-        ""
-      } else {
-        "(but not really)"
-      }
+      val messageSuffix =
+          if (!config.trialMode) {
+            MemberBehavior(guild, awardUser.snowflake, kord)
+                .addRole(role, "Automatic $roleName award")
+            ""
+          } else {
+            "(but not really)"
+          }
       repository.commitAwardGrant(awardUser)
       MessageChannelBehavior(config.announceChannel.snowflake, kord)
           .createMessage("Granted <@$awardUser> Regular. $messageSuffix")
@@ -128,12 +130,14 @@ class ProgressManager(
     val role = config.role.snowflake
     val roleName = RoleBehavior(guild, role, kord).asRole().name
     for (awardUser in users) {
-      val messageSuffix = if (!config.trialMode) {
-        MemberBehavior(guild, awardUser.snowflake, kord).removeRole(role, "Automatic $roleName strip")
-        ""
-      } else {
-        "(but not really)"
-      }
+      val messageSuffix =
+          if (!config.trialMode) {
+            MemberBehavior(guild, awardUser.snowflake, kord)
+                .removeRole(role, "Automatic $roleName strip")
+            ""
+          } else {
+            "(but not really)"
+          }
       repository.commitAwardStrip(awardUser)
       MessageChannelBehavior(config.announceChannel.snowflake, kord)
           .createMessage("Removed Regular from <@$awardUser> due to inactivity. $messageSuffix")
@@ -159,6 +163,7 @@ class ProgressManager(
   private suspend fun saveProgress() {
     val now = timeSource.markNow()
     grantAward(repository.writeMessageScore(cachedProgress.values))
+    println("saved")
     // no need to keep users in memory beyond messageTimeout, since their next message is guaranteed
     // to credit
     cachedProgress.entries.removeAll { now - it.value.lastCredit > config.messageTimeout }
