@@ -9,10 +9,9 @@ import dev.kord.gateway.PrivilegedIntent
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.datetime.Clock
 
 suspend fun main(args: Array<String>) {
-  println("Hello World!")
-  println("Program arguments: ${args.joinToString()}")
   if (args.isEmpty()) {
     println("Not enough arguments")
     return
@@ -21,14 +20,13 @@ suspend fun main(args: Array<String>) {
   val config = TraktConfig.readConfig(args[0])
   val bot = Kord(config.token)
 
-  println("created bot")
   val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
   val userRepository = UserRepository(config)
   val progressManager = ProgressManager(bot, userRepository, config, scope).startCollection()
   val sanctionManager = SanctionManager(userRepository, config, scope).startCollection()
   val commandManager = CommandManager(bot, progressManager, userRepository, config)
 
-  println("collection started")
+  printLogging("Collection started")
   bot.on<MessageCreateEvent> {
     if (guildId?.value != config.guild || member?.isBot == true) return@on
     if (sanctionManager.maybeSanction(this)) {
@@ -43,4 +41,8 @@ suspend fun main(args: Array<String>) {
     @OptIn(PrivilegedIntent::class)
     intents += Intent.MessageContent
   }
+}
+
+fun printLogging(msg: String) {
+  println("${Clock.System.now()} $msg")
 }
