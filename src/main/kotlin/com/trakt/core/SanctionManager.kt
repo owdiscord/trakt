@@ -38,13 +38,20 @@ class SanctionManager(
 
   private fun submitSanction(embed: Embed) {
     val actionType = embed.title?.split(' ')?.firstOrNull() ?: return
+    var user: String? = null
     for (field in embed.fields) {
       if (field.name == "User") {
-        val snowflake = Regex("<@!?(\\d+)>").find(field.value)?.groupValues?.getOrNull(1) ?: return
-        sanctionChannel.trySend(Penalty(snowflake.toULong(), actionType))
-        return
+        user = Regex("<@!?(\\d+)>").find(field.value)?.groupValues?.getOrNull(1) ?: return
+      }
+      if (field.name == "Moderator") {
+        // don't sanction automatic actions
+        if (Regex("<@!?(\\d+)>").find(field.value)?.groupValues?.getOrNull(1) == "473868086773153793") {
+          printLogging("Skipping automatic sanction of user $user")
+          return
+        }
       }
     }
+    user?.also { sanctionChannel.trySend(Penalty(it.toULong(), actionType)) }
   }
 
   fun maybeSanction(event: MessageCreateEvent): Boolean {
