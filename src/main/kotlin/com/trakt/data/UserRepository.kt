@@ -26,6 +26,10 @@ class UserRepository(private val config: TraktConfig) {
         SchemaUtils.createDatabase("trakt")
       }
       SchemaUtils.create(UsersTable)
+      // sanity check people's message scores
+      UserEntity.find { UsersTable.messageScore greater config.messageAwardThreshold }.forEach {
+        it.messageScore = config.messageAwardThreshold
+      }
     }
   }
 

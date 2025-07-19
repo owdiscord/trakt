@@ -75,8 +75,10 @@ class ProgressManager(
             progress.credit()
           } else {
             // if we didn't have them in memory they can't have been in timeout, so
-            // unconditionally credit them
-            cachedProgress[user] = Progress(user, repository.messageScoreForUser(user) + 1)
+            // unconditionally credit them (unless they're already at the threshold)
+            repository.messageScoreForUser(user).also { score ->
+              cachedProgress[user] = Progress(user, if (score < config.messageAwardThreshold) score + 1 else score)
+            }
           }
         } catch (_: Exception) {
         }
