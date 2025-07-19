@@ -4,6 +4,7 @@ package com.trakt.data
 
 import com.trakt.core.ProgressManager
 import com.trakt.core.TraktConfig
+import com.trakt.core.printLogging
 import kotlinx.coroutines.DelicateCoroutinesApi
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.newSingleThreadContext
@@ -27,6 +28,7 @@ class UserRepository(private val config: TraktConfig) {
       }
       SchemaUtils.create(UsersTable)
       // sanity check people's message scores
+      printLogging("Performing startup message score sanity check")
       UserEntity.find { UsersTable.messageScore greater config.messageAwardThreshold }.forEach {
         it.messageScore = config.messageAwardThreshold
       }
