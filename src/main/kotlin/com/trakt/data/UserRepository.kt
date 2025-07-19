@@ -15,6 +15,7 @@ import org.jetbrains.exposed.sql.SchemaUtils
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
 import org.jetbrains.exposed.sql.Transaction
 import org.jetbrains.exposed.sql.and
+import org.jetbrains.exposed.sql.or
 import org.jetbrains.exposed.sql.transactions.transaction
 
 class UserRepository(private val config: TraktConfig) {
@@ -30,9 +31,27 @@ class UserRepository(private val config: TraktConfig) {
       SchemaUtils.create(UsersTable)
       // sanity check people's message scores
       printLogging("Performing startup message score sanity check")
-      UserEntity.find { UsersTable.messageScore greater config.messageAwardThreshold }.forEach {
-        it.messageScore = config.messageAwardThreshold
-      }
+      UserEntity.find { UsersTable.messageScore greater config.messageAwardThreshold }
+          .forEach { it.messageScore = config.messageAwardThreshold }
+
+      val now = Clock.System.now().epochSeconds
+      UserEntity.find {
+            ((UsersTable.isMuted eq true) or (UsersTable.isBanned eq true)) and
+                UsersTable.sanctionTime.isNull()
+          }
+          .forEach { it.sanctionTime = now }
+
+      // This bit doesn't have to be very precise. If they've been sanctioned for more than twice
+      // the imposed delay, just bust them right back to the start regardless.
+      UserEntity.find { UsersTable.sanctionTime.isNotNull() }
+          .forEach { user ->
+            user.sanctionTime?.also { sanctionTime ->
+              val days = if (user.isMuted) config.muteDelayPeriods else config.banDelayPeriods
+              if (now - sanctionTime > (days * 2 * 86400)) {
+                user.delete()
+              }
+            }
+          }
     }
   }
 
@@ -130,6 +149,8 @@ class UserRepository(private val config: TraktConfig) {
           it.messageScore = 0
           it.timeScore = -config.muteDelayPeriods
           it.sanctionTime = Clock.System.now().epochSeconds
+        } else {
+          it.sanctionTime = null
         }
       }
     }
@@ -143,6 +164,8 @@ class UserRepository(private val config: TraktConfig) {
           it.messageScore = 0
           it.timeScore = -config.banDelayPeriods
           it.sanctionTime = Clock.System.now().epochSeconds
+        } else {
+          it.sanctionTime = null
         }
       }
     }
