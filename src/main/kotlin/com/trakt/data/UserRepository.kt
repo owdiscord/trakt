@@ -29,7 +29,6 @@ class UserRepository(private val config: TraktConfig) {
         SchemaUtils.createDatabase("trakt")
       }
       SchemaUtils.create(UsersTable)
-      SchemaUtils.createMissingTablesAndColumns()
       // sanity check people's message scores
       printLogging("Performing startup message score sanity check")
       UserEntity.find { UsersTable.messageScore greater config.messageAwardThreshold }
