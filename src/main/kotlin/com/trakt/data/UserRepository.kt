@@ -9,6 +9,7 @@ import kotlinx.coroutines.DelicateCoroutinesApi
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.newSingleThreadContext
 import kotlinx.coroutines.withContext
+import kotlinx.datetime.Clock
 import org.jetbrains.exposed.sql.Database
 import org.jetbrains.exposed.sql.SchemaUtils
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
@@ -128,6 +129,7 @@ class UserRepository(private val config: TraktConfig) {
         if (isMuted) {
           it.messageScore = 0
           it.timeScore = -config.muteDelayPeriods
+          it.sanctionTime = Clock.System.now().epochSeconds
         }
       }
     }
@@ -140,6 +142,7 @@ class UserRepository(private val config: TraktConfig) {
         if (isBanned) {
           it.messageScore = 0
           it.timeScore = -config.banDelayPeriods
+          it.sanctionTime = Clock.System.now().epochSeconds
         }
       }
     }

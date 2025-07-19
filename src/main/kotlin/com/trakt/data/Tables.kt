@@ -12,6 +12,7 @@ object UsersTable : IntIdTable() {
   val hasAward = bool("has_regular").default(false)
   val isBanned = bool("is_banned").default(false)
   val isMuted = bool("is_muted").default(false)
+  val sanctionTime = long("sanction_time").nullable().default(null)
 }
 
 class UserEntity(id: EntityID<Int>) : IntEntity(id) {
@@ -23,4 +24,5 @@ class UserEntity(id: EntityID<Int>) : IntEntity(id) {
   var hasAward by UsersTable.hasAward
   var isBanned by UsersTable.isBanned
   var isMuted by UsersTable.isMuted
+  var sanctionTime by UsersTable.sanctionTime
 }
