@@ -5,11 +5,11 @@ import dev.kord.core.Kord
 import dev.kord.core.behavior.MemberBehavior
 import dev.kord.core.behavior.RoleBehavior
 import dev.kord.core.behavior.channel.MessageChannelBehavior
-import kotlinx.coroutines.*
-import kotlinx.coroutines.channels.Channel
 import java.util.concurrent.ConcurrentHashMap
 import kotlin.time.ComparableTimeMark
 import kotlin.time.TimeSource
+import kotlinx.coroutines.*
+import kotlinx.coroutines.channels.Channel
 
 class ProgressManager(
     private val kord: Kord,
@@ -33,7 +33,7 @@ class ProgressManager(
       if (now - lastCredit < config.messageTimeout) {
         return false
       }
-      if (messageScore < config.messageAwardThreshold) {
+      if (messageScore < (config.messageAwardThreshold + 10)) {
         messageScore++
       }
       lastCredit = now
@@ -77,11 +77,12 @@ class ProgressManager(
             // if we didn't have them in memory they can't have been in timeout, so
             // unconditionally credit them (unless they're already at the threshold)
             repository.messageScoreForUser(user).also { score ->
-              cachedProgress[user] = Progress(user, if (score < config.messageAwardThreshold) score + 1 else score)
+              cachedProgress[user] =
+                  Progress(
+                      user, if (score < (config.messageAwardThreshold + 10)) score + 1 else score)
             }
           }
-        } catch (_: Exception) {
-        }
+        } catch (_: Exception) {}
       }
     }
     scope.launch {
@@ -89,8 +90,7 @@ class ProgressManager(
         try {
           delay(config.progressSavePeriod)
           saveProgress()
-        } catch (_: Exception) {
-        }
+        } catch (_: Exception) {}
       }
     }
     scope.launch {
@@ -98,8 +98,7 @@ class ProgressManager(
         try {
           delay(config.timeScorePeriod)
           timeScoreTick()
-        } catch (_: Exception) {
-        }
+        } catch (_: Exception) {}
       }
     }
     scope.launch {
@@ -107,8 +106,7 @@ class ProgressManager(
         try {
           delay(config.messageDecayPeriod)
           doDecay()
-        } catch (_: Exception) {
-        }
+        } catch (_: Exception) {}
       }
     }
     return this

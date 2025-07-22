@@ -31,7 +31,7 @@ class UserRepository(private val config: TraktConfig) {
       SchemaUtils.create(UsersTable)
       // sanity check people's message scores
       printLogging("Performing startup message score sanity check")
-      UserEntity.find { UsersTable.messageScore greater config.messageAwardThreshold }
+      UserEntity.find { UsersTable.messageScore greater (config.messageAwardThreshold + 10) }
           .forEach { it.messageScore = config.messageAwardThreshold }
 
       val now = Clock.System.now().epochSeconds
