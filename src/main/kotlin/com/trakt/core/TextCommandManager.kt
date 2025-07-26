@@ -61,6 +61,7 @@ class TextCommandManager(
         event.message.channel.createMessage(
             "You have requested to strip **${stripRoles.size}** roles from everyone in the server. This is a very " +
                 "expensive operation. To confirm you want it, react \uD83C\uDD97 to this message.")
+    printLogging("Adding confirmation message with id ${confirmationMessage.id.value}")
     val timeoutJob =
         scope.launch {
           delay(30000)
@@ -69,6 +70,9 @@ class TextCommandManager(
         }
     reactionListener =
         kord.on<ReactionAddEvent> {
+          printLogging("Reaction from user ${event.member?.id?.value} on message ${event.message.id}. Emoji was" +
+              emoji.name
+          )
           if (event.member?.roleBehaviors?.any { it.id.value == config.massRoleRole } != true ||
               event.message.id != confirmationMessage.id || emoji.name != "🆗") {
             return@on
