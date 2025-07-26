@@ -37,6 +37,7 @@ class TextCommandManager(private val kord: Kord, private val config: TraktConfig
     val statusMessage = event.message.channel.createMessage("Stripping roles. This may take a while.")
     scope.launch {
       chunkFlow.collect {
+        printLogging("Processing chunk ${it.chunkIndex} of ${it.chunkCount} expected")
         for (member in it.members) {
           for (role in member.roleBehaviors) {
             val snowflake = role.id
