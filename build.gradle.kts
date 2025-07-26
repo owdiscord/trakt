@@ -25,7 +25,7 @@ java {
 dependencies {
     testImplementation(kotlin("test"))
     implementation("com.h2database:h2:2.2.220")
-    implementation("dev.kord:kord-core:0.14.0")
+    implementation("dev.kord:kord-core:0.15.0")
     implementation(kotlin("stdlib"))
     implementation("org.jetbrains.exposed:exposed-core:$exposedVersion")
     implementation("org.jetbrains.exposed:exposed-crypt:$exposedVersion")

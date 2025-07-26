@@ -39,6 +39,11 @@ data class TraktConfig(
     val progressSavePeriod: Duration,
     /** Don't actually commit role changes (but announce them still) */
     val trialMode: Boolean,
+    /** Role required to do mass role operations **/
+    val massRoleRole: ULong,
+    /** Roles to strip **/
+    val massRoleStripRoles: List<ULong>,
+    val massRoleTrialIds: List<ULong>?,
 ) {
 
   companion object {

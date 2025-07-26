@@ -12,6 +12,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.datetime.Clock
 
+@OptIn(PrivilegedIntent::class)
 suspend fun main(args: Array<String>) {
   if (args.isEmpty()) {
     println("Not enough arguments")
@@ -26,6 +27,7 @@ suspend fun main(args: Array<String>) {
   val progressManager = ProgressManager(bot, userRepository, config, scope).startCollection()
   val sanctionManager = SanctionManager(userRepository, config, scope).startCollection()
   val commandManager = CommandManager(bot, progressManager, userRepository, config)
+  val textCommandManager = TextCommandManager(bot, config, scope)
 
   printLogging("Collection started")
   bot.on<MessageCreateEvent> {
@@ -34,6 +36,7 @@ suspend fun main(args: Array<String>) {
       return@on
     }
     member?.id?.also { progressManager.submitProgress(it.value) }
+    textCommandManager.processCommand(this)
   }
 
   bot.on<MemberLeaveEvent> {
@@ -43,8 +46,8 @@ suspend fun main(args: Array<String>) {
   commandManager.setupCommands()
 
   bot.login {
-    @OptIn(PrivilegedIntent::class)
     intents += Intent.MessageContent
+    intents += Intent.GuildMembers
   }
 }
 
