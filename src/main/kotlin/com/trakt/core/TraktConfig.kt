@@ -41,8 +41,6 @@ data class TraktConfig(
     val trialMode: Boolean,
     /** Role required to do mass role operations **/
     val massRoleRole: ULong,
-    /** Roles to strip **/
-    val massRoleStripRoles: List<ULong>,
     val massRoleTrialIds: List<ULong>?,
 ) {
 
