@@ -105,6 +105,14 @@ class UserRepository(private val config: TraktConfig) {
     return result
   }
 
+  suspend fun userLeft(user: ULong) {
+    safeTransaction {
+      UserEntity.findSingleByAndUpdate(UsersTable.snowflake eq user) {
+        it.hasAward = false
+      }
+    }
+  }
+
   /**
    * Update all known users' time scores if they are below the threshold. Return a list of users who
    * now qualify for award as a result of this change.

@@ -2,6 +2,7 @@ package com.trakt.core
 
 import com.trakt.data.UserRepository
 import dev.kord.core.Kord
+import dev.kord.core.event.guild.MemberLeaveEvent
 import dev.kord.core.event.message.MessageCreateEvent
 import dev.kord.core.on
 import dev.kord.gateway.Intent
@@ -33,6 +34,10 @@ suspend fun main(args: Array<String>) {
       return@on
     }
     member?.id?.also { progressManager.submitProgress(it.value) }
+  }
+
+  bot.on<MemberLeaveEvent> {
+    userRepository.userLeft(user.id.value)
   }
 
   commandManager.setupCommands()
