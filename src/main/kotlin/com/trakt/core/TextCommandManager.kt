@@ -20,6 +20,7 @@ class TextCommandManager(private val kord: Kord, private val config: TraktConfig
     for (role in event.member?.roleBehaviors ?: emptySet()) {
       if (role.id.value == config.massRoleRole) {
         hasPerms = true
+        break
       }
     }
     if (!hasPerms) {
@@ -39,7 +40,9 @@ class TextCommandManager(private val kord: Kord, private val config: TraktConfig
       chunkFlow.collect {
         printLogging("Processing chunk ${it.chunkIndex} of ${it.chunkCount} expected")
         for (member in it.members) {
+          printLogging("Processing user ${member.id.value}")
           for (role in member.roleBehaviors) {
+            printLogging("Processing user ${role.id.value}")
             val snowflake = role.id
             if (stripRoles.contains(snowflake.value)) {
               member.removeRole(snowflake)
@@ -47,6 +50,7 @@ class TextCommandManager(private val kord: Kord, private val config: TraktConfig
           }
         }
       }
+      printLogging("Reporting completion")
       event.message.channel.createMessage {
         messageReference = statusMessage.id
         content = "Completed this strip operation. Yay!"
