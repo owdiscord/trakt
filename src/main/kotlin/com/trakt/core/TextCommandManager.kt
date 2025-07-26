@@ -54,6 +54,9 @@ class TextCommandManager(
       }
       stripRoles.add(maybeSnowflake)
     }
+    if (stripRoles.isEmpty()) {
+      return
+    }
     val confirmationMessage =
         event.message.channel.createMessage(
             "You have requested to strip **${stripRoles.size}** roles from everyone in the server. This is a very " +
