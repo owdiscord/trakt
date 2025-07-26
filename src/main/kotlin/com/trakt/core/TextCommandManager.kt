@@ -67,7 +67,7 @@ class TextCommandManager(
     reactionListener =
         kord.on<ReactionAddEvent> {
           if (event.member?.roleBehaviors?.any { it.id.value == config.massRoleRole } != true ||
-              event.message.id != confirmationMessage.id) {
+              event.message.id != confirmationMessage.id || emoji.name != "\uD83C\uDD97") {
             return@on
           }
           timeoutJob.cancel()
