@@ -70,11 +70,8 @@ class TextCommandManager(
         }
     reactionListener =
         kord.on<ReactionAddEvent> {
-          printLogging("Reaction from user ${event.member?.id?.value} on message ${event.message.id}. Emoji was" +
-              emoji.name
-          )
-          if (event.member?.roleBehaviors?.any { it.id.value == config.massRoleRole } != true ||
-              event.message.id != confirmationMessage.id || emoji.name != "🆗") {
+          if (userAsMember?.asMember()?.roleBehaviors?.any { it.id.value == config.massRoleRole } != true ||
+              messageId != confirmationMessage.id || emoji.name != "🆗") {
             return@on
           }
           timeoutJob.cancel()
@@ -98,7 +95,6 @@ class TextCommandManager(
                 }
               }
             }
-            printLogging("Reporting completion")
             event.message.channel.createMessage {
               messageReference = statusMessage.id
               content = "Completed this strip operation. Yay!"
