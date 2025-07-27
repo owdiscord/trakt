@@ -41,7 +41,6 @@ data class TraktConfig(
     val trialMode: Boolean,
     /** Role required to do mass role operations **/
     val massRoleRole: ULong,
-    val massRoleTrialIds: List<ULong>?,
 ) {
 
   companion object {

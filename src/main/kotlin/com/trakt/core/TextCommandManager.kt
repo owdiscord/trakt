@@ -1,6 +1,5 @@
 package com.trakt.core
 
-import dev.kord.common.entity.Snowflake
 import dev.kord.core.Kord
 import dev.kord.core.behavior.GuildBehavior
 import dev.kord.core.behavior.channel.createMessage
@@ -70,15 +69,14 @@ class TextCommandManager(
         }
     reactionListener =
         kord.on<ReactionAddEvent> {
-          if (userAsMember?.asMember()?.roleBehaviors?.any { it.id.value == config.massRoleRole } != true ||
-              messageId != confirmationMessage.id || emoji.name != "🆗") {
+          if (userAsMember?.asMember()?.roleBehaviors?.any { it.id.value == config.massRoleRole } !=
+              true || messageId != confirmationMessage.id || emoji.name != "🆗") {
             return@on
           }
           timeoutJob.cancel()
           val chunkFlow =
               GuildBehavior(config.guild.snowflake, kord).fetchGuild().requestMembers {
-                userIds =
-                    config.massRoleTrialIds?.map { Snowflake(it) }?.toMutableSet() ?: mutableSetOf()
+                requestAllMembers()
               }
           val statusMessage =
               event.message.channel.createMessage(
