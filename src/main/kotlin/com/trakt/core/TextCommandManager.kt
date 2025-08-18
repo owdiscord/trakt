@@ -1,5 +1,6 @@
 package com.trakt.core
 
+import dev.kord.common.annotation.KordPreview
 import dev.kord.core.Kord
 import dev.kord.core.behavior.GuildBehavior
 import dev.kord.core.behavior.channel.createMessage
@@ -7,7 +8,8 @@ import dev.kord.core.behavior.edit
 import dev.kord.core.behavior.requestMembers
 import dev.kord.core.event.message.MessageCreateEvent
 import dev.kord.core.event.message.ReactionAddEvent
-import dev.kord.core.on
+import dev.kord.core.live.live
+import dev.kord.core.live.on
 import dev.kord.gateway.PrivilegedIntent
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
@@ -21,7 +23,7 @@ class TextCommandManager(
 ) {
 
   val handlers = mapOf("?strip" to ::strip)
-  var reactionListener: Job? = null
+  var stripJob: Job? = null
 
   suspend fun processCommand(event: MessageCreateEvent) {
     var hasPerms = false
@@ -39,9 +41,9 @@ class TextCommandManager(
     handlers[args.first()]?.invoke(event, args.drop(1))
   }
 
-  @OptIn(PrivilegedIntent::class)
+  @OptIn(PrivilegedIntent::class, KordPreview::class)
   suspend fun strip(event: MessageCreateEvent, args: List<String>) {
-    if (reactionListener?.isActive == true) {
+    if (stripJob?.isActive == true) {
       return
     }
     val stripRoles: MutableSet<ULong> = mutableSetOf()
@@ -61,16 +63,17 @@ class TextCommandManager(
             "You have requested to strip **${stripRoles.size}** roles from everyone in the server. This is a very " +
                 "expensive operation. To confirm you want it, react \uD83C\uDD97 to this message.")
     printLogging("Adding confirmation message with id ${confirmationMessage.id.value}")
+    var reactionListener: Job? = null
     val timeoutJob =
-        scope.launch {
-          delay(30000)
-          reactionListener?.cancel()
-          confirmationMessage.edit { content = "Confirmation timed out." }
-        }
+      scope.launch {
+        delay(30000)
+        reactionListener?.cancel()
+        confirmationMessage.edit { content = "Confirmation timed out." }
+      }
     reactionListener =
-        kord.on<ReactionAddEvent> {
-          if (userAsMember?.asMember()?.roleBehaviors?.any { it.id.value == config.massRoleRole } !=
-              true || messageId != confirmationMessage.id || emoji.name != "🆗") {
+        confirmationMessage.live().on<ReactionAddEvent> { confirmReaction ->
+          if (confirmReaction.userAsMember?.asMember()?.roleBehaviors?.any { it.id.value == config.massRoleRole } !=
+              true || confirmReaction.messageId != confirmationMessage.id || confirmReaction.emoji.name != "🆗") {
             return@on
           }
           timeoutJob.cancel()
@@ -78,11 +81,28 @@ class TextCommandManager(
               GuildBehavior(config.guild.snowflake, kord).fetchGuild().requestMembers {
                 requestAllMembers()
               }
+          var includeMention = false
           val statusMessage =
-              event.message.channel.createMessage(
-                  "Stripping ${stripRoles.size} roles. This may take a while.")
-          scope.launch {
+              event.message.channel
+                  .createMessage(
+                      "Stripping ${stripRoles.size} roles. This may take a while. React ⏰ to be mentioned on completion.")
+          var notifyJob: Job? = null
+          notifyJob = statusMessage.live().on<ReactionAddEvent> { notifyReaction ->
+            if (notifyReaction.emoji.name != "⏰" || event.member?.id != confirmReaction.userAsMember?.id) {
+              return@on
+            }
+            includeMention = true
+            notifyJob?.cancel()
+          }
+          stripJob = scope.launch {
+            var announcedChunkCount = false
             chunkFlow.collect {
+              if (!announcedChunkCount) {
+                statusMessage.edit {
+                  content += " The server expects that this will take about ${it.chunkCount / 4} mins (very roughly)."
+                }
+                announcedChunkCount = true
+              }
               printLogging("Processing chunk ${it.chunkIndex} of ${it.chunkCount} expected")
               for (member in it.members) {
                 for (role in member.roleBehaviors) {
@@ -96,6 +116,9 @@ class TextCommandManager(
             event.message.channel.createMessage {
               messageReference = statusMessage.id
               content = "Completed this strip operation. Yay!"
+              if (includeMention) {
+                event.member?.id?.also { content += " <@$it.>" }
+              }
             }
           }
           reactionListener?.cancel()
