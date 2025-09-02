@@ -175,6 +175,8 @@ class UserRepository(private val config: TraktConfig) {
   suspend fun dockMessageScore(): DecayResult {
     val result = mutableSetOf<ULong>()
     val awardResult = mutableSetOf<ULong>()
+    var longSanctionUsers = 0
+    var expiredUsers = 0
     safeTransaction {
       for (user in UserEntity.all()) {
         val sanctionTime = user.sanctionTime
@@ -185,10 +187,11 @@ class UserRepository(private val config: TraktConfig) {
           val days = if (user.isMuted) config.muteDelayPeriods else config.banDelayPeriods
           if (now - sanctionTime > (days * 2 * 86400)) {
             user.delete()
+            longSanctionUsers++
           }
 
-          // Don't allow users to wipe their slate clean early by simply not talking. We've already
-          // set their score to zero.
+          // Don't allow users to wipe their slate clean early by simply not talking. If sanction_time is set,
+          // this user has been naughty and must wait out their punishment.
           continue
         }
         if (user.messageScore <= config.messageDecayMagnitude) {
@@ -197,11 +200,14 @@ class UserRepository(private val config: TraktConfig) {
           }
           result.add(user.snowflake)
           user.delete()
+          expiredUsers++
           continue
         }
         user.messageScore -= config.messageDecayMagnitude
       }
     }
+    printLogging("Activity decay done. Deleted $longSanctionUsers long sanction users." +
+        " Deleted $expiredUsers expired users.")
     return DecayResult(awardResult, result)
   }
 
