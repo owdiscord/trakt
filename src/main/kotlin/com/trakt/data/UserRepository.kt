@@ -40,18 +40,6 @@ class UserRepository(private val config: TraktConfig) {
                 UsersTable.sanctionTime.isNull()
           }
           .forEach { it.sanctionTime = now }
-
-      // This bit doesn't have to be very precise. If they've been sanctioned for more than twice
-      // the imposed delay, just bust them right back to the start regardless.
-      UserEntity.find { UsersTable.sanctionTime.isNotNull() }
-          .forEach { user ->
-            user.sanctionTime?.also { sanctionTime ->
-              val days = if (user.isMuted) config.muteDelayPeriods else config.banDelayPeriods
-              if (now - sanctionTime > (days * 2 * 86400)) {
-                user.delete()
-              }
-            }
-          }
     }
   }
 
@@ -189,7 +177,16 @@ class UserRepository(private val config: TraktConfig) {
     val awardResult = mutableSetOf<ULong>()
     safeTransaction {
       for (user in UserEntity.all()) {
-        if (user.isBanned || user.isMuted) {
+        val sanctionTime = user.sanctionTime
+        if (sanctionTime != null) {
+          // This bit doesn't have to be very precise. If they've been sanctioned for more than twice
+          // the imposed delay, just bust them right back to the start regardless.
+          val now = Clock.System.now().epochSeconds
+          val days = if (user.isMuted) config.muteDelayPeriods else config.banDelayPeriods
+          if (now - sanctionTime > (days * 2 * 86400)) {
+            user.delete()
+          }
+
           // Don't allow users to wipe their slate clean early by simply not talking. We've already
           // set their score to zero.
           continue
