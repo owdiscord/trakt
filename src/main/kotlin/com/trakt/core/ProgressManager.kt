@@ -68,21 +68,25 @@ class ProgressManager(
 
   fun startCollection(): ProgressManager {
     scope.launch {
-      for (user in progressChannel) {
+      while (isActive) {
         try {
-          val progress = cachedProgress[user]
-          if (progress != null) {
-            progress.credit()
-          } else {
-            // if we didn't have them in memory they can't have been in timeout, so
-            // unconditionally credit them (unless they're already at the threshold)
-            repository.messageScoreForUser(user).also { score ->
-              cachedProgress[user] =
+          for (user in progressChannel) {
+            val progress = cachedProgress[user]
+            if (progress != null) {
+              progress.credit()
+            } else {
+              // if we didn't have them in memory they can't have been in timeout, so
+              // unconditionally credit them (unless they're already at the threshold)
+              repository.messageScoreForUser(user).also { score ->
+                cachedProgress[user] =
                   Progress(
-                      user, if (score < (config.messageAwardThreshold + 10)) score + 1 else score)
+                    user, if (score < (config.messageAwardThreshold + 10)) score + 1 else score)
+              }
             }
           }
-        } catch (_: Exception) {}
+        } catch (e: Exception) {
+          printLogging(e)
+        }
       }
     }
     scope.launch {
@@ -98,7 +102,9 @@ class ProgressManager(
         try {
           delay(config.timeScorePeriod)
           timeScoreTick()
-        } catch (_: Exception) {}
+        } catch (e: Exception) {
+          printLogging(e)
+        }
       }
     }
     scope.launch {
@@ -106,7 +112,9 @@ class ProgressManager(
         try {
           delay(config.messageDecayPeriod)
           doDecay()
-        } catch (_: Exception) {}
+        } catch (e: Exception) {
+          printLogging(e)
+        }
       }
     }
     return this

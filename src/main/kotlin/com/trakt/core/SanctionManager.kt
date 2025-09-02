@@ -5,6 +5,7 @@ import dev.kord.core.entity.Embed
 import dev.kord.core.event.message.MessageCreateEvent
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 
 class SanctionManager(
@@ -22,14 +23,20 @@ class SanctionManager(
 
   fun startCollection(): SanctionManager {
     scope.launch {
-      for (penalty in sanctionChannel) {
-        printLogging("Processing sanction: $penalty")
-        when (penalty.actionType) {
-          "WARN" -> repository.addWarn(penalty.user)
-          "MUTE" -> repository.updateMuteStatus(penalty.user, true)
-          "UNMUTE" -> repository.updateMuteStatus(penalty.user, false)
-          "BAN" -> repository.updateBanStatus(penalty.user, true)
-          "UNBAN" -> repository.updateBanStatus(penalty.user, false)
+      while (isActive) {
+        try {
+          for (penalty in sanctionChannel) {
+            printLogging("Processing sanction: $penalty")
+            when (penalty.actionType) {
+              "WARN" -> repository.addWarn(penalty.user)
+              "MUTE" -> repository.updateMuteStatus(penalty.user, true)
+              "UNMUTE" -> repository.updateMuteStatus(penalty.user, false)
+              "BAN" -> repository.updateBanStatus(penalty.user, true)
+              "UNBAN" -> repository.updateBanStatus(penalty.user, false)
+            }
+          }
+        } catch (e: Exception) {
+          printLogging(e)
         }
       }
     }

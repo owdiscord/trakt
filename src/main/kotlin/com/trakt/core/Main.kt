@@ -54,3 +54,7 @@ suspend fun main(args: Array<String>) {
 fun printLogging(msg: String) {
   println("${Clock.System.now()} $msg")
 }
+
+fun printLogging(e: Exception) {
+  println("${Clock.System.now()} ${e.message}")
+}
