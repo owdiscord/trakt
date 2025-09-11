@@ -41,6 +41,10 @@ data class TraktConfig(
     val trialMode: Boolean,
     /** Role required to do mass role operations **/
     val massRoleRole: ULong,
+    /** Total voice time required in the last 7 days **/
+    val voiceWeekThreshold: Duration,
+    /** Total voice time required in the last 30 days **/
+    val voiceMonthThreshold: Duration,
 ) {
 
   companion object {

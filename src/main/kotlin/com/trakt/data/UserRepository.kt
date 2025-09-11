@@ -10,6 +10,10 @@ import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.newSingleThreadContext
 import kotlinx.coroutines.withContext
 import kotlinx.datetime.Clock
+import kotlinx.datetime.DatePeriod
+import kotlinx.datetime.TimeZone
+import kotlinx.datetime.minus
+import kotlinx.datetime.todayIn
 import org.jetbrains.exposed.sql.Database
 import org.jetbrains.exposed.sql.SchemaUtils
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
@@ -29,6 +33,7 @@ class UserRepository(private val config: TraktConfig) {
         SchemaUtils.createDatabase("trakt")
       }
       SchemaUtils.create(UsersTable)
+      SchemaUtils.create(VoiceSessionTable)
       // sanity check people's message scores
       printLogging("Performing startup message score sanity check")
       UserEntity.find { UsersTable.messageScore greater (config.messageAwardThreshold + 10) }
@@ -95,9 +100,7 @@ class UserRepository(private val config: TraktConfig) {
 
   suspend fun userLeft(user: ULong) {
     safeTransaction {
-      UserEntity.findSingleByAndUpdate(UsersTable.snowflake eq user) {
-        it.hasAward = false
-      }
+      UserEntity.findSingleByAndUpdate(UsersTable.snowflake eq user) { it.hasAward = false }
     }
   }
 
@@ -181,7 +184,8 @@ class UserRepository(private val config: TraktConfig) {
       for (user in UserEntity.all()) {
         val sanctionTime = user.sanctionTime
         if (sanctionTime != null) {
-          // This bit doesn't have to be very precise. If they've been sanctioned for more than twice
+          // This bit doesn't have to be very precise. If they've been sanctioned for more than
+          // twice
           // the imposed delay, just bust them right back to the start regardless.
           val now = Clock.System.now().epochSeconds
           val days = if (user.isMuted) config.muteDelayPeriods else config.banDelayPeriods
@@ -190,7 +194,8 @@ class UserRepository(private val config: TraktConfig) {
             longSanctionUsers++
           }
 
-          // Don't allow users to wipe their slate clean early by simply not talking. If sanction_time is set,
+          // Don't allow users to wipe their slate clean early by simply not talking. If
+          // sanction_time is set,
           // this user has been naughty and must wait out their punishment.
           continue
         }
@@ -206,8 +211,9 @@ class UserRepository(private val config: TraktConfig) {
         user.messageScore -= config.messageDecayMagnitude
       }
     }
-    printLogging("Activity decay done. Deleted $longSanctionUsers long sanction users." +
-        " Deleted $expiredUsers expired users.")
+    printLogging(
+        "Activity decay done. Deleted $longSanctionUsers long sanction users." +
+            " Deleted $expiredUsers expired users.")
     return DecayResult(awardResult, result)
   }
 
@@ -220,6 +226,107 @@ class UserRepository(private val config: TraktConfig) {
   suspend fun commitAwardStrip(user: ULong) {
     safeTransaction {
       UserEntity.findSingleByAndUpdate(UsersTable.snowflake eq user) { it.hasAward = false }
+    }
+  }
+
+  suspend fun addVoiceTime(user: ULong, duration: Long) {
+    safeTransaction {
+      VoiceSessionEntity.findSingleByAndUpdate(
+          (VoiceSessionTable.snowflake eq user) and
+              (VoiceSessionTable.sessionDate eq Clock.System.todayIn(TimeZone.UTC))) {
+            it.sessionDuration += duration
+          }
+          ?: VoiceSessionEntity.new {
+            snowflake = user
+            sessionDuration = duration
+            sessionDate = Clock.System.todayIn(TimeZone.UTC)
+          }
+      VoiceSummaryEntity.findSingleByAndUpdate(VoiceSummaryTable.snowflake eq user) {
+        it.weekTotal += duration
+        it.monthTotal += duration
+      }
+    }
+  }
+
+  /**
+   * Do a daily tick of voice data. The following things happen:
+   * - Read all session data >30 days old. Delete the sessions after noting their durations
+   *   (`monthDurations`).
+   * - Read all session data 30 <= X < 7 days old. Note their durations (`weekDurations`).
+   * - For all users in `monthDurations`, reduce their `monthTotal` by the summed durations. Delete
+   *   if <=0.
+   * - For all users in `weekDuration`, reduce their `weekTotal` by the summed durations. Delete if
+   *   <=0.
+   * - Return two lists: users who gained and users who lost as a result.
+   */
+  suspend fun purgeOldVoiceSessions(): Pair<List<ULong>, List<ULong>> {
+    val today = Clock.System.todayIn(TimeZone.UTC)
+    val weekCutoff = today - DatePeriod(days = 7)
+    val monthCutoff = today - DatePeriod(days = 30)
+    val monthDurations = mutableMapOf<ULong, MutableList<Long>>()
+    val weekDurations = mutableMapOf<ULong, MutableList<Long>>()
+    val addedResult = mutableListOf<ULong>()
+    val removedResult = mutableListOf<ULong>()
+    safeTransaction {
+      printLogging("Removing old voice sessions")
+      VoiceSessionEntity.find { VoiceSessionTable.sessionDate less monthCutoff }
+          .forEach {
+            monthDurations.getOrPut(it.snowflake) { mutableListOf() }.add(it.sessionDuration)
+            it.delete()
+          }
+
+      printLogging("Moving sessions from week bucket to month bucket")
+      VoiceSessionEntity.find {
+            (VoiceSessionTable.sessionDate greaterEq monthCutoff) and
+                (VoiceSessionTable.sessionDate less weekCutoff)
+          }
+          .forEach {
+            weekDurations.getOrPut(it.snowflake) { mutableListOf() }.add(it.sessionDuration)
+          }
+
+      printLogging("Modifying month totals")
+      VoiceSummaryEntity.find { VoiceSessionTable.snowflake inList monthDurations.keys }
+          .forEach {
+            monthDurations[it.snowflake]?.also { durations ->
+              val duration = durations.sum()
+              if (it.monthTotal <= duration) {
+                removedResult.add(it.snowflake)
+                it.delete()
+              } else {
+                it.monthTotal -= duration
+              }
+            }
+          }
+
+      printLogging("Modifying week totals")
+      VoiceSummaryEntity.find { VoiceSessionTable.snowflake inList weekDurations.keys }
+          .forEach {
+            weekDurations[it.snowflake]?.also { durations ->
+              val duration = durations.sum()
+              if (it.weekTotal <= duration) {
+                removedResult.add(it.snowflake)
+                it.delete()
+              } else {
+                it.weekTotal -= duration
+              }
+            }
+          }
+
+      printLogging("Finding qualified users")
+      VoiceSummaryEntity.find {
+            (VoiceSummaryTable.weekTotal greaterEq config.voiceWeekThreshold.inWholeSeconds) and
+                (VoiceSummaryTable.monthTotal greaterEq config.voiceMonthThreshold.inWholeSeconds)
+          }
+          .forEach { addedResult.add(it.snowflake) }
+    }
+    return Pair(addedResult, removedResult)
+  }
+
+  suspend fun commitVoiceAwardGrant(user: ULong) {
+    safeTransaction {
+      VoiceSummaryEntity.findSingleByAndUpdate(VoiceSummaryTable.snowflake eq user) {
+        it.hasAward = true
+      }
     }
   }
 

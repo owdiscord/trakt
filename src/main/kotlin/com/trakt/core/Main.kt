@@ -25,6 +25,7 @@ suspend fun main(args: Array<String>) {
   val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
   val userRepository = UserRepository(config)
   val progressManager = ProgressManager(bot, userRepository, config, scope).startCollection()
+  VoiceProgressManager(bot, userRepository, config, scope).start()
   val sanctionManager = SanctionManager(userRepository, config, scope).startCollection()
   val commandManager = CommandManager(bot, progressManager, userRepository, config)
   val textCommandManager = TextCommandManager(bot, config, scope)
@@ -39,9 +40,7 @@ suspend fun main(args: Array<String>) {
     textCommandManager.processCommand(this)
   }
 
-  bot.on<MemberLeaveEvent> {
-    userRepository.userLeft(user.id.value)
-  }
+  bot.on<MemberLeaveEvent> { userRepository.userLeft(user.id.value) }
 
   commandManager.setupCommands()
 
