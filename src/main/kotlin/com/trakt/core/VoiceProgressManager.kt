@@ -39,7 +39,7 @@ class VoiceProgressManager(
       while (isActive) {
         try {
           delay(1.days)
-          val (added, removed) = repository.purgeOldVoiceSessions()
+          val (added, removed) = repository.doVoiceTick()
           grantAward(added)
           stripAward(removed)
         } catch (_: Exception) {}
@@ -85,6 +85,7 @@ class VoiceProgressManager(
           } else {
             "(but not really)"
           }
+      repository.commitVoiceAwardStrip(awardUser)
       MessageChannelBehavior(config.announceChannel.snowflake, kord)
           .createMessage(
               "Removed Regular from <@$awardUser> due to voice inactivity. $messageSuffix")

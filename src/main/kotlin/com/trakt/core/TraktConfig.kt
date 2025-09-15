@@ -1,9 +1,9 @@
 package com.trakt.core
 
-import java.io.File
-import kotlin.time.Duration
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
+import java.io.File
+import kotlin.time.Duration
 
 @Serializable
 data class TraktConfig(
@@ -39,12 +39,14 @@ data class TraktConfig(
     val progressSavePeriod: Duration,
     /** Don't actually commit role changes (but announce them still) */
     val trialMode: Boolean,
-    /** Role required to do mass role operations **/
+    /** Role required to do mass role operations */
     val massRoleRole: ULong,
-    /** Total voice time required in the last 7 days **/
+    /** Total voice time required in the last 7 days */
     val voiceWeekThreshold: Duration,
-    /** Total voice time required in the last 30 days **/
+    /** Total voice time required in the last 30 days */
     val voiceMonthThreshold: Duration,
+    /** How often to process voice data */
+    val voiceTickPeriod: Duration,
 ) {
 
   companion object {

@@ -21,6 +21,7 @@ import org.jetbrains.exposed.sql.Transaction
 import org.jetbrains.exposed.sql.and
 import org.jetbrains.exposed.sql.or
 import org.jetbrains.exposed.sql.transactions.transaction
+import org.jetbrains.exposed.sql.upsert
 
 class UserRepository(private val config: TraktConfig) {
 
@@ -250,74 +251,65 @@ class UserRepository(private val config: TraktConfig) {
 
   /**
    * Do a daily tick of voice data. The following things happen:
-   * - Read all session data >30 days old. Delete the sessions after noting their durations
-   *   (`monthDurations`).
-   * - Read all session data 30 <= X < 7 days old. Note their durations (`weekDurations`).
-   * - For all users in `monthDurations`, reduce their `monthTotal` by the summed durations. Delete
-   *   if <=0.
-   * - For all users in `weekDuration`, reduce their `weekTotal` by the summed durations. Delete if
-   *   <=0.
+   * - Delete all session data greater than 30 days old.
+   * - Read all session data. Sum their durations (`monthDurations`).
+   * - Read all session data within the past week. Sum their durations (`weekDurations`).
+   * - Apply appropriate durations to users as their month total and week total.
+   * - Find users who now qualify for award.
+   * - Find users who should now have award taken (month total less than half the threshold).
    * - Return two lists: users who gained and users who lost as a result.
    */
-  suspend fun purgeOldVoiceSessions(): Pair<List<ULong>, List<ULong>> {
+  suspend fun doVoiceTick(): Pair<List<ULong>, List<ULong>> {
     val today = Clock.System.todayIn(TimeZone.UTC)
     val weekCutoff = today - DatePeriod(days = 7)
     val monthCutoff = today - DatePeriod(days = 30)
-    val monthDurations = mutableMapOf<ULong, MutableList<Long>>()
-    val weekDurations = mutableMapOf<ULong, MutableList<Long>>()
+    val monthDurations = mutableMapOf<ULong, Long>()
+    val weekDurations = mutableMapOf<ULong, Long>()
     val addedResult = mutableListOf<ULong>()
     val removedResult = mutableListOf<ULong>()
     safeTransaction {
       printLogging("Removing old voice sessions")
       VoiceSessionEntity.find { VoiceSessionTable.sessionDate less monthCutoff }
+          .forEach { it.delete() }
+
+      printLogging("Collecting month totals")
+      VoiceSessionEntity.all().forEach {
+        monthDurations[it.snowflake] = it.sessionDuration + (monthDurations[it.snowflake] ?: 0)
+      }
+
+      printLogging("Collecting week totals")
+      VoiceSessionEntity.find { VoiceSessionTable.sessionDate greaterEq weekCutoff }
           .forEach {
-            monthDurations.getOrPut(it.snowflake) { mutableListOf() }.add(it.sessionDuration)
-            it.delete()
+            weekDurations[it.snowflake] = it.sessionDuration + (weekDurations[it.snowflake] ?: 0)
           }
 
-      printLogging("Moving sessions from week bucket to month bucket")
-      VoiceSessionEntity.find {
-            (VoiceSessionTable.sessionDate greaterEq monthCutoff) and
-                (VoiceSessionTable.sessionDate less weekCutoff)
-          }
-          .forEach {
-            weekDurations.getOrPut(it.snowflake) { mutableListOf() }.add(it.sessionDuration)
-          }
-
-      printLogging("Modifying month totals")
-      VoiceSummaryEntity.find { VoiceSessionTable.snowflake inList monthDurations.keys }
-          .forEach {
-            monthDurations[it.snowflake]?.also { durations ->
-              val duration = durations.sum()
-              if (it.monthTotal <= duration) {
-                removedResult.add(it.snowflake)
-                it.delete()
-              } else {
-                it.monthTotal -= duration
-              }
-            }
-          }
-
-      printLogging("Modifying week totals")
-      VoiceSummaryEntity.find { VoiceSessionTable.snowflake inList weekDurations.keys }
-          .forEach {
-            weekDurations[it.snowflake]?.also { durations ->
-              val duration = durations.sum()
-              if (it.weekTotal <= duration) {
-                removedResult.add(it.snowflake)
-                it.delete()
-              } else {
-                it.weekTotal -= duration
-              }
-            }
-          }
+      VoiceSummaryTable.upsert {
+      }
+      printLogging("Applying totals")
+      for ((user, monthTotal) in monthDurations) {
+        VoiceSummaryEntity.findSingleByAndUpdate(VoiceSessionTable.snowflake eq user) {
+          it.monthTotal = monthTotal
+          it.weekTotal = weekDurations[user] ?: 0
+        } ?: VoiceSummaryEntity.new {
+          snowflake = user
+          this.monthTotal = monthTotal
+          this.weekTotal = weekDurations[user] ?: 0
+        }
+      }
 
       printLogging("Finding qualified users")
       VoiceSummaryEntity.find {
-            (VoiceSummaryTable.weekTotal greaterEq config.voiceWeekThreshold.inWholeSeconds) and
+            (VoiceSummaryTable.hasAward eq false) and
+                (VoiceSummaryTable.weekTotal greaterEq config.voiceWeekThreshold.inWholeSeconds) and
                 (VoiceSummaryTable.monthTotal greaterEq config.voiceMonthThreshold.inWholeSeconds)
           }
           .forEach { addedResult.add(it.snowflake) }
+
+      VoiceSummaryEntity.find {
+            (VoiceSummaryTable.hasAward eq true) and
+                (VoiceSummaryTable.weekTotal less (config.voiceWeekThreshold.inWholeSeconds / 2))
+          }
+          .forEach { removedResult.add(it.snowflake) }
     }
     return Pair(addedResult, removedResult)
   }
@@ -326,6 +318,14 @@ class UserRepository(private val config: TraktConfig) {
     safeTransaction {
       VoiceSummaryEntity.findSingleByAndUpdate(VoiceSummaryTable.snowflake eq user) {
         it.hasAward = true
+      }
+    }
+  }
+
+  suspend fun commitVoiceAwardStrip(user: ULong) {
+    safeTransaction {
+      VoiceSummaryEntity.findSingleByAndUpdate(VoiceSummaryTable.snowflake eq user) {
+        it.hasAward = false
       }
     }
   }
