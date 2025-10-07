@@ -5,11 +5,14 @@ import dev.kord.core.Kord
 import dev.kord.core.behavior.MemberBehavior
 import dev.kord.core.behavior.RoleBehavior
 import dev.kord.core.behavior.channel.MessageChannelBehavior
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
+import kotlinx.coroutines.launch
 import java.util.concurrent.ConcurrentHashMap
 import kotlin.time.ComparableTimeMark
 import kotlin.time.TimeSource
-import kotlinx.coroutines.*
-import kotlinx.coroutines.channels.Channel
 
 class ProgressManager(
     private val kord: Kord,
@@ -79,8 +82,10 @@ class ProgressManager(
               // unconditionally credit them (unless they're already at the threshold)
               repository.messageScoreForUser(user).also { score ->
                 cachedProgress[user] =
-                  Progress(
-                    user, if (score < (config.messageAwardThreshold + 10)) score + 1 else score)
+                    Progress(
+                        user,
+                        if (score < (config.messageAwardThreshold + 10)) score + 1 else score,
+                    )
               }
             }
           }
@@ -154,6 +159,10 @@ class ProgressManager(
           if (!config.trialMode) {
             MemberBehavior(guild, awardUser.snowflake, kord)
                 .removeRole(role, "Automatic $roleName strip")
+            for (role in config.ancillaryRoles) {
+              MemberBehavior(guild, awardUser.snowflake, kord)
+                  .removeRole(role.snowflake, "Automatic $roleName strip")
+            }
             ""
           } else {
             "(but not really)"

@@ -10,6 +10,7 @@ data class TraktConfig(
     val token: String,
     val guild: ULong,
     val role: ULong,
+    val ancillaryRoles: List<ULong>,
     val sanctionChannel: ULong,
     val announceChannel: ULong,
     /** Required message score for award. */
