@@ -25,7 +25,7 @@ suspend fun main(args: Array<String>) {
   val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
   val userRepository = UserRepository(config)
   val progressManager = ProgressManager(bot, userRepository, config, scope).startCollection()
-  VoiceProgressManager(bot, userRepository, config, scope).start()
+//  VoiceProgressManager(bot, userRepository, config, scope).start()
   val sanctionManager = SanctionManager(userRepository, config, scope).startCollection()
   val commandManager = CommandManager(bot, progressManager, userRepository, config)
   val textCommandManager = TextCommandManager(bot, config, scope)
