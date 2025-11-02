@@ -29,10 +29,8 @@ class SanctionManager(
             printLogging("Processing sanction: $penalty")
             when (penalty.actionType) {
               "WARN" -> repository.addWarn(penalty.user)
-              "MUTE" -> repository.updateMuteStatus(penalty.user, true)
-              "UNMUTE" -> repository.updateMuteStatus(penalty.user, false)
-              "BAN" -> repository.updateBanStatus(penalty.user, true)
-              "UNBAN" -> repository.updateBanStatus(penalty.user, false)
+              "MUTE" -> repository.commitMute(penalty.user)
+              "BAN" -> repository.commitBan(penalty.user)
             }
           }
         } catch (e: Exception) {

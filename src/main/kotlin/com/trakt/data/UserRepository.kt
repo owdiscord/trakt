@@ -19,7 +19,6 @@ import org.jetbrains.exposed.sql.SchemaUtils
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
 import org.jetbrains.exposed.sql.Transaction
 import org.jetbrains.exposed.sql.and
-import org.jetbrains.exposed.sql.or
 import org.jetbrains.exposed.sql.transactions.transaction
 import org.jetbrains.exposed.sql.upsert
 
@@ -40,12 +39,21 @@ class UserRepository(private val config: TraktConfig) {
       UserEntity.find { UsersTable.messageScore greater (config.messageAwardThreshold + 10) }
           .forEach { it.messageScore = config.messageAwardThreshold }
 
-      val now = Clock.System.now().epochSeconds
       UserEntity.find {
-            ((UsersTable.isMuted eq true) or (UsersTable.isBanned eq true)) and
-                UsersTable.sanctionTime.isNull()
-          }
-          .forEach { it.sanctionTime = now }
+        UsersTable.isMuted eq true
+      }.forEach {
+        it.isMuted = false
+        it.messageScore = 0
+        it.timeScore = -config.muteDelayPeriods
+      }
+
+      UserEntity.find {
+        UsersTable.isBanned eq true
+      }.forEach {
+        it.isBanned = false
+        it.messageScore = 0
+        it.timeScore = -config.banDelayPeriods
+      }
     }
   }
 
@@ -141,32 +149,20 @@ class UserRepository(private val config: TraktConfig) {
     }
   }
 
-  suspend fun updateMuteStatus(user: ULong, isMuted: Boolean) {
+  suspend fun commitMute(user: ULong) {
     safeTransaction {
       UserEntity.findSingleByAndUpdate(UsersTable.snowflake eq user) {
-        it.isMuted = isMuted
-        if (isMuted) {
-          it.messageScore = 0
-          it.timeScore = -config.muteDelayPeriods
-          it.sanctionTime = Clock.System.now().epochSeconds
-        } else {
-          it.sanctionTime = null
-        }
+        it.messageScore = 0
+        it.timeScore = -config.muteDelayPeriods
       }
     }
   }
 
-  suspend fun updateBanStatus(user: ULong, isBanned: Boolean) {
+  suspend fun commitBan(user: ULong) {
     safeTransaction {
       UserEntity.findSingleByAndUpdate(UsersTable.snowflake eq user) {
-        it.isBanned = isBanned
-        if (isBanned) {
-          it.messageScore = 0
-          it.timeScore = -config.banDelayPeriods
-          it.sanctionTime = Clock.System.now().epochSeconds
-        } else {
-          it.sanctionTime = null
-        }
+        it.messageScore = 0
+        it.timeScore = -config.banDelayPeriods
       }
     }
   }
@@ -179,27 +175,9 @@ class UserRepository(private val config: TraktConfig) {
   suspend fun dockMessageScore(): DecayResult {
     val result = mutableSetOf<ULong>()
     val awardResult = mutableSetOf<ULong>()
-    var longSanctionUsers = 0
     var expiredUsers = 0
     safeTransaction {
       for (user in UserEntity.all()) {
-        val sanctionTime = user.sanctionTime
-        if (sanctionTime != null) {
-          // This bit doesn't have to be very precise. If they've been sanctioned for more than
-          // twice
-          // the imposed delay, just bust them right back to the start regardless.
-          val now = Clock.System.now().epochSeconds
-          val days = if (user.isMuted) config.muteDelayPeriods else config.banDelayPeriods
-          if (now - sanctionTime > (days * 2 * 86400)) {
-            user.delete()
-            longSanctionUsers++
-          }
-
-          // Don't allow users to wipe their slate clean early by simply not talking. If
-          // sanction_time is set,
-          // this user has been naughty and must wait out their punishment.
-          continue
-        }
         if (user.messageScore <= config.messageDecayMagnitude) {
           if (user.hasAward) {
             awardResult.add(user.snowflake)
@@ -212,9 +190,7 @@ class UserRepository(private val config: TraktConfig) {
         user.messageScore -= config.messageDecayMagnitude
       }
     }
-    printLogging(
-        "Activity decay done. Deleted $longSanctionUsers long sanction users." +
-            " Deleted $expiredUsers expired users.")
+    printLogging("Activity decay done. Deleted $expiredUsers expired users.")
     return DecayResult(awardResult, result)
   }
 
