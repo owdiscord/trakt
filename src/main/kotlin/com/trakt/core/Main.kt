@@ -1,3 +1,5 @@
+@file:OptIn(ExperimentalTime::class)
+
 package com.trakt.core
 
 import com.trakt.data.UserRepository
@@ -10,7 +12,8 @@ import dev.kord.gateway.PrivilegedIntent
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
-import kotlinx.datetime.Clock
+import kotlin.time.Clock
+import kotlin.time.ExperimentalTime
 
 @OptIn(PrivilegedIntent::class)
 suspend fun main(args: Array<String>) {
@@ -29,6 +32,7 @@ suspend fun main(args: Array<String>) {
   val sanctionManager = SanctionManager(userRepository, config, scope).startCollection()
   val commandManager = CommandManager(bot, progressManager, userRepository, config)
   val textCommandManager = TextCommandManager(bot, config, scope)
+  val followManager = FollowManager(bot, userRepository, config, scope).start()
 
   printLogging("Collection started")
   bot.on<MessageCreateEvent> {
@@ -38,6 +42,7 @@ suspend fun main(args: Array<String>) {
     }
     member?.id?.also { progressManager.submitProgress(it.value) }
     textCommandManager.processCommand(this)
+    followManager.handleMessage(this)
   }
 
   bot.on<MemberLeaveEvent> { userRepository.userLeft(user.id.value) }

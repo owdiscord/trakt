@@ -57,3 +57,17 @@ class VoiceSummaryEntity(id: EntityID<Int>) : IntEntity(id) {
   var monthTotal by VoiceSummaryTable.monthTotal
   var hasAward by VoiceSummaryTable.hasAward
 }
+
+object MessageTrackingTable : IntIdTable() {
+  val owner = ulong("owner").index()
+  val target = ulong("target").index()
+  val timeout = integer("timeout")
+}
+
+class MessageTrackingEntity(id: EntityID<Int>) : IntEntity(id) {
+  companion object : IntEntityClass<MessageTrackingEntity>(MessageTrackingTable)
+
+  var owner by MessageTrackingTable.owner
+  var target by MessageTrackingTable.target
+  var timeout by MessageTrackingTable.timeout
+}

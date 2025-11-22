@@ -13,7 +13,8 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
-import kotlinx.datetime.Clock
+import kotlin.time.Clock
+import kotlin.time.ExperimentalTime
 
 class VoiceProgressManager(
     private val kord: Kord,
@@ -24,6 +25,7 @@ class VoiceProgressManager(
 
   private val voiceSessions = ConcurrentHashMap<ULong, Long>()
 
+  @OptIn(ExperimentalTime::class)
   fun start() {
     kord.on<VoiceStateUpdateEvent> {
       val user = state.userId.value

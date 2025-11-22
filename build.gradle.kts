@@ -1,10 +1,10 @@
-import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
+import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 
 val exposedVersion: String by project
 
 plugins {
-    kotlin("jvm") version "2.0.20"
-    kotlin("plugin.serialization") version "2.0.20"
+    kotlin("jvm") version "2.2.20"
+    kotlin("plugin.serialization") version "2.2.20"
     application
 }
 
@@ -22,10 +22,16 @@ java {
     targetCompatibility = JavaVersion.VERSION_21
 }
 
+kotlin {
+    compilerOptions {
+        jvmTarget = JvmTarget.JVM_21
+    }
+}
+
 dependencies {
     testImplementation(kotlin("test"))
     implementation("com.h2database:h2:2.2.220")
-    implementation("dev.kord:kord-core:0.15.0")
+    implementation("dev.kord:kord-core:0.17.0")
     implementation(kotlin("stdlib"))
     implementation("org.jetbrains.exposed:exposed-core:$exposedVersion")
     implementation("org.jetbrains.exposed:exposed-crypt:$exposedVersion")
@@ -49,20 +55,12 @@ tasks.jar {
     manifest {
         attributes["Main-Class"] = "com.trakt.core.MainKt"
     }
-
-//    configurations["compileClasspath"].forEach { file: File ->
-//        from(zipTree(file.absoluteFile))
-//    }
     from(sourceSets.main.get().output)
     dependsOn(configurations.runtimeClasspath)
     from({
         configurations.runtimeClasspath.get().filter { it.name.endsWith("jar") }.map { zipTree(it) }
     })
     duplicatesStrategy = DuplicatesStrategy.EXCLUDE
-}
-
-tasks.withType<KotlinCompile> {
-    kotlinOptions.jvmTarget = "21"
 }
 
 application {

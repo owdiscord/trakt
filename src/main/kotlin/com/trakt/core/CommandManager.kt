@@ -19,11 +19,15 @@ class CommandManager(
     private val kord: Kord,
     private val progressManager: ProgressManager,
     private val userRepository: UserRepository,
-    private val config: TraktConfig
+    private val config: TraktConfig,
 ) {
   private val handlers =
       mutableMapOf<String, suspend (InteractionCommand) -> String?>(
-          "view" to ::handleView, "edit" to ::handleEdit)
+          "view" to ::handleView,
+          "edit" to ::handleEdit,
+          "follow" to ::handleFollow,
+          "unfollow" to ::handleUnfollow,
+      )
 
   suspend fun setupCommands() {
     kord.createGuildChatInputCommand(config.guild.snowflake, "trakt", "Interact with trakt") {
@@ -43,6 +47,16 @@ class CommandManager(
         }
         string("snowflake", "User ID") { required = true }
         integer("override", "Override value") { required = true }
+      }
+      subCommand("follow", "Be notified whenever a user posts") {
+        string("snowflake", "User ID to follow") { required = true }
+        string(
+            "timeout",
+            "Minimum duration, in seconds, between alerts for this follow (default 300)",
+        )
+      }
+      subCommand("unfollow", "Remove a follow rule") {
+        string("snowflake", "User ID to unfollow") { required = true }
       }
     }
 
@@ -108,6 +122,36 @@ class CommandManager(
     val username =
         MemberBehavior(config.guild.snowflake, snowflake.snowflake, kord).asUser().username
     return "Score for **$username** is now **$overrideValue**."
+  }
+
+  private suspend fun handleFollow(command: InteractionCommand): String? {
+    val invoker = command.data.id.value?.value ?: return null
+    val snowflake =
+        command.strings["snowflake"]?.toULongOrNull() ?: return "Invalid Discord ID, you doofus."
+    val timeout = command.strings["seconds"]?.toIntOrNull() ?: 300
+    userRepository.addTracking(invoker, snowflake, timeout)
+    val username =
+        MemberBehavior(config.guild.snowflake, snowflake.snowflake, kord).asUser().username
+    val timeoutCommentary =
+        if (timeout != 0) {
+          "alerting at most every $timeout seconds."
+        } else {
+          "alerting on every message."
+        }
+    return "You are now following $username, $timeoutCommentary."
+  }
+
+  private suspend fun handleUnfollow(command: InteractionCommand): String? {
+    val invoker = command.data.id.value?.value ?: return null
+    val snowflake =
+        command.strings["snowflake"]?.toULongOrNull() ?: return "Invalid Discord ID, you doofus."
+    val username =
+        MemberBehavior(config.guild.snowflake, snowflake.snowflake, kord).asUser().username
+    return if (userRepository.removeTracking(invoker, snowflake)) {
+      "Removed your follow for **$username**."
+    } else {
+      "You weren't following **$username**."
+    }
   }
 
   companion object {

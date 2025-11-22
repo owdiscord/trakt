@@ -7,25 +7,19 @@ import com.trakt.core.TraktConfig
 import com.trakt.core.printLogging
 import kotlinx.coroutines.DelicateCoroutinesApi
 import kotlinx.coroutines.ExperimentalCoroutinesApi
-import kotlinx.coroutines.newSingleThreadContext
-import kotlinx.coroutines.withContext
-import kotlinx.datetime.Clock
 import kotlinx.datetime.DatePeriod
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.minus
 import kotlinx.datetime.todayIn
-import org.jetbrains.exposed.sql.Database
-import org.jetbrains.exposed.sql.SchemaUtils
+import org.jetbrains.exposed.sql.*
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
-import org.jetbrains.exposed.sql.Transaction
-import org.jetbrains.exposed.sql.and
 import org.jetbrains.exposed.sql.transactions.transaction
-import org.jetbrains.exposed.sql.upsert
+import kotlin.time.Clock
+import kotlin.time.ExperimentalTime
 
-class UserRepository(private val config: TraktConfig) {
+class UserRepository(config: TraktConfig) : Repository(config) {
 
   init {
-    //    Database.connect("jdbc:h2:mem:test;DB_CLOSE_DELAY=-1")
     Database.connect("jdbc:sqlite:${System.getProperty("user.home")}/trakt-db/data.db")
     println(System.getProperty("user.dir"))
     transaction {
@@ -39,21 +33,19 @@ class UserRepository(private val config: TraktConfig) {
       UserEntity.find { UsersTable.messageScore greater (config.messageAwardThreshold + 10) }
           .forEach { it.messageScore = config.messageAwardThreshold }
 
-      UserEntity.find {
-        UsersTable.isMuted eq true
-      }.forEach {
-        it.isMuted = false
-        it.messageScore = 0
-        it.timeScore = -config.muteDelayPeriods
-      }
+      UserEntity.find { UsersTable.isMuted eq true }
+          .forEach {
+            it.isMuted = false
+            it.messageScore = 0
+            it.timeScore = -config.muteDelayPeriods
+          }
 
-      UserEntity.find {
-        UsersTable.isBanned eq true
-      }.forEach {
-        it.isBanned = false
-        it.messageScore = 0
-        it.timeScore = -config.banDelayPeriods
-      }
+      UserEntity.find { UsersTable.isBanned eq true }
+          .forEach {
+            it.isBanned = false
+            it.messageScore = 0
+            it.timeScore = -config.banDelayPeriods
+          }
     }
   }
 
@@ -206,13 +198,15 @@ class UserRepository(private val config: TraktConfig) {
     }
   }
 
+  @OptIn(ExperimentalTime::class)
   suspend fun addVoiceTime(user: ULong, duration: Long) {
     safeTransaction {
       VoiceSessionEntity.findSingleByAndUpdate(
           (VoiceSessionTable.snowflake eq user) and
-              (VoiceSessionTable.sessionDate eq Clock.System.todayIn(TimeZone.UTC))) {
-            it.sessionDuration += duration
-          }
+              (VoiceSessionTable.sessionDate eq Clock.System.todayIn(TimeZone.UTC))
+      ) {
+        it.sessionDuration += duration
+      }
           ?: VoiceSessionEntity.new {
             snowflake = user
             sessionDuration = duration
@@ -235,6 +229,7 @@ class UserRepository(private val config: TraktConfig) {
    * - Find users who should now have award taken (month total less than half the threshold).
    * - Return two lists: users who gained and users who lost as a result.
    */
+  @OptIn(ExperimentalTime::class)
   suspend fun doVoiceTick(): Pair<List<ULong>, List<ULong>> {
     val today = Clock.System.todayIn(TimeZone.UTC)
     val weekCutoff = today - DatePeriod(days = 7)
@@ -259,18 +254,18 @@ class UserRepository(private val config: TraktConfig) {
             weekDurations[it.snowflake] = it.sessionDuration + (weekDurations[it.snowflake] ?: 0)
           }
 
-      VoiceSummaryTable.upsert {
-      }
+      VoiceSummaryTable.upsert {}
       printLogging("Applying totals")
       for ((user, monthTotal) in monthDurations) {
         VoiceSummaryEntity.findSingleByAndUpdate(VoiceSessionTable.snowflake eq user) {
           it.monthTotal = monthTotal
           it.weekTotal = weekDurations[user] ?: 0
-        } ?: VoiceSummaryEntity.new {
-          snowflake = user
-          this.monthTotal = monthTotal
-          this.weekTotal = weekDurations[user] ?: 0
         }
+            ?: VoiceSummaryEntity.new {
+              snowflake = user
+              this.monthTotal = monthTotal
+              this.weekTotal = weekDurations[user] ?: 0
+            }
       }
 
       printLogging("Finding qualified users")
@@ -306,11 +301,33 @@ class UserRepository(private val config: TraktConfig) {
     }
   }
 
-  private suspend fun <T> safeTransaction(db: Database? = null, statement: Transaction.() -> T): T {
-    return withContext(dispatcher) { transaction(db, statement) }
+  suspend fun addTracking(owner: ULong, target: ULong, timeout: Int) {
+    safeTransaction {
+      MessageTrackingEntity.findSingleByAndUpdate(
+          (MessageTrackingTable.owner eq owner) and (MessageTrackingTable.target eq target)
+      ) {
+        it.timeout = timeout
+      }
+          ?: MessageTrackingEntity.new {
+            this.owner = owner
+            this.target = target
+            this.timeout = timeout
+          }
+    }
   }
 
-  companion object {
-    private val dispatcher = newSingleThreadContext("repository")
+  /** Return true if we removed a row */
+  suspend fun removeTracking(owner: ULong, target: ULong): Boolean {
+    return safeTransaction {
+      MessageTrackingTable.deleteWhere {
+        (MessageTrackingTable.owner eq owner) and (MessageTrackingTable.target eq target)
+      } != 0
+    }
+  }
+
+  suspend fun loadTrackingInfo(loadCb: (ULong, ULong, Int) -> Unit) {
+    return safeTransaction {
+      MessageTrackingEntity.all().forEach { loadCb(it.target, it.owner, it.timeout) }
+    }
   }
 }

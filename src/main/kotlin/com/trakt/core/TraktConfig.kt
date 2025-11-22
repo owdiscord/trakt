@@ -48,6 +48,8 @@ data class TraktConfig(
     val voiceMonthThreshold: Duration,
     /** How often to process voice data */
     val voiceTickPeriod: Duration,
+    /** Channel to announce follow alerts */
+    val followChannel: ULong
 ) {
 
   companion object {
