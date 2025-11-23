@@ -30,6 +30,7 @@ class FollowManager(
   fun start(): FollowManager {
     scope.launch {
       repository.loadTrackingInfo(::loadCb)
+      printLogging("Loaded ${activeFollows.size} follow entries.")
     }
     return this
   }
@@ -42,6 +43,7 @@ class FollowManager(
       if ((now - follow.triggerTime) < follow.timeout.seconds) {
         continue
       }
+      printLogging("Alerting for followed user")
       follow.triggerTime = now
       alert(event, target, follow)
     }
