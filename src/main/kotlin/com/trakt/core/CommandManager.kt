@@ -141,7 +141,7 @@ class CommandManager(
         } else {
           "alerting on every message."
         }
-    return "You are now following $username, $timeoutCommentary."
+    return "You are now following $username, $timeoutCommentary"
   }
 
   private suspend fun handleUnfollow(command: InteractionCommand, user: Member): String? {
