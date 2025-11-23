@@ -130,7 +130,7 @@ class CommandManager(
     val invoker = user.id.value
     val snowflake =
         command.strings["snowflake"]?.toULongOrNull() ?: return "Invalid Discord ID, you doofus."
-    val timeout = command.strings["seconds"]?.toIntOrNull() ?: 300
+    val timeout = command.strings["timeout"]?.toIntOrNull() ?: 300
     userRepository.addTracking(invoker, snowflake, timeout)
     followManager.handleFollow(invoker, snowflake, timeout)
     val username =
