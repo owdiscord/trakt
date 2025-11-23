@@ -5,31 +5,26 @@ import dev.kord.core.Kord
 import dev.kord.core.behavior.MemberBehavior
 import dev.kord.core.behavior.channel.MessageChannelBehavior
 import dev.kord.core.event.message.MessageCreateEvent
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.launch
 import kotlin.time.ComparableTimeMark
 import kotlin.time.Duration.Companion.seconds
 import kotlin.time.TimeSource
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.launch
 
 class FollowManager(
-  private val kord: Kord,
-  private val repository: UserRepository,
-  private val config: TraktConfig,
-  private val scope: CoroutineScope
+    private val kord: Kord,
+    private val repository: UserRepository,
+    private val config: TraktConfig,
+    private val scope: CoroutineScope,
 ) {
 
   private val timeSource = TimeSource.Monotonic
-  private data class FollowTrigger(val owner: ULong, val timeout: Int, var triggerTime: ComparableTimeMark)
-
-  private val activeFollows: MutableMap<ULong, MutableSet<FollowTrigger>> = mutableMapOf()
-
-  private fun loadCb(target: ULong, owner: ULong, timeout: Int) {
-    activeFollows.getOrPut(target) { mutableSetOf() }.add(FollowTrigger(owner, timeout, timeSource.markNow()))
-  }
+  private val activeFollows: MutableMap<ULong, MutableMap<ULong, Pair<Int, ComparableTimeMark>>> =
+      mutableMapOf()
 
   fun start(): FollowManager {
     scope.launch {
-      repository.loadTrackingInfo(::loadCb)
+      repository.loadTrackingInfo(::handleFollow)
       printLogging("Loaded ${activeFollows.size} follow entries.")
     }
     return this
@@ -40,24 +35,33 @@ class FollowManager(
     val followsForUser = activeFollows[target] ?: return
     val now = timeSource.markNow()
     for (follow in followsForUser) {
-      if ((now - follow.triggerTime) < follow.timeout.seconds) {
+      val timeout = follow.value.first
+      if ((now - follow.value.second) < timeout.seconds) {
         continue
       }
       printLogging("Alerting for followed user")
-      follow.triggerTime = now
-      alert(event, target, follow)
+      follow.setValue(Pair(timeout, now))
+      alert(event, target, follow.key)
     }
   }
 
-  private suspend fun alert(event: MessageCreateEvent, target: ULong, follow: FollowTrigger) {
+  fun handleFollow(owner: ULong, target: ULong, timeout: Int) {
+    activeFollows.getOrPut(target) { mutableMapOf() }[owner] =
+        Pair(timeout, timeSource.markNow() - timeout.seconds)
+  }
+
+  fun handleUnfollow(owner: ULong, target: ULong) {
+    activeFollows[target]?.remove(owner)
+  }
+
+  private suspend fun alert(event: MessageCreateEvent, target: ULong, owner: ULong) {
     val id = event.message.id.value
     val guild = event.guildId?.value ?: return
     val channel = event.message.channel.id.value
     val url = "https://discord.com/channels/$guild/$channel/$id"
-    val mention = "<@${follow.owner}>"
+    val mention = "<@${owner}>"
     val username = MemberBehavior(config.guild.snowflake, target.snowflake, kord).asUser().username
-    MessageChannelBehavior(config.followChannel.snowflake, kord).createMessage(
-      "$mention Your follow for $username triggered here: $url"
-    )
+    MessageChannelBehavior(config.followChannel.snowflake, kord)
+        .createMessage("$mention Your follow for $username triggered here: $url")
   }
 }

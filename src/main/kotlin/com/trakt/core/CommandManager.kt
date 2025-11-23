@@ -4,6 +4,7 @@ import com.trakt.data.UserRepository
 import dev.kord.core.Kord
 import dev.kord.core.behavior.MemberBehavior
 import dev.kord.core.behavior.interaction.response.respond
+import dev.kord.core.entity.Member
 import dev.kord.core.entity.interaction.GroupCommand
 import dev.kord.core.entity.interaction.InteractionCommand
 import dev.kord.core.entity.interaction.RootCommand
@@ -19,10 +20,11 @@ class CommandManager(
     private val kord: Kord,
     private val progressManager: ProgressManager,
     private val userRepository: UserRepository,
+    private val followManager: FollowManager,
     private val config: TraktConfig,
 ) {
   private val handlers =
-      mutableMapOf<String, suspend (InteractionCommand) -> String?>(
+      mutableMapOf<String, suspend (InteractionCommand, Member) -> String?>(
           "view" to ::handleView,
           "edit" to ::handleEdit,
           "follow" to ::handleFollow,
@@ -69,7 +71,7 @@ class CommandManager(
             is GroupCommand -> command.groupName
             is RootCommand -> command.rootName
           }
-      val responseContent = handlers[name]?.invoke(command) ?: ERROR_RESPONSE_CONTENT
+      val responseContent = handlers[name]?.invoke(command, interaction.user) ?: ERROR_RESPONSE_CONTENT
       response.respond { content = responseContent }
     }
 
@@ -96,7 +98,7 @@ class CommandManager(
     }
   }
 
-  private suspend fun handleView(command: InteractionCommand): String? {
+  private suspend fun handleView(command: InteractionCommand, user: Member): String? {
     val snowflake = command.strings["snowflake"]?.toULong() ?: return null
     val score =
         when (command.strings["score_type"]) {
@@ -111,7 +113,7 @@ class CommandManager(
     return "Score for **$username** is **$score**."
   }
 
-  private suspend fun handleEdit(command: InteractionCommand): String? {
+  private suspend fun handleEdit(command: InteractionCommand, user: Member): String? {
     val snowflake = command.strings["snowflake"]?.toULong() ?: return null
     val overrideValue = command.integers["override"] ?: return null
     when (command.strings["score_type"]) {
@@ -124,12 +126,13 @@ class CommandManager(
     return "Score for **$username** is now **$overrideValue**."
   }
 
-  private suspend fun handleFollow(command: InteractionCommand): String? {
-    val invoker = command.data.id.value?.value ?: return null
+  private suspend fun handleFollow(command: InteractionCommand, user: Member): String? {
+    val invoker = user.id.value
     val snowflake =
         command.strings["snowflake"]?.toULongOrNull() ?: return "Invalid Discord ID, you doofus."
     val timeout = command.strings["seconds"]?.toIntOrNull() ?: 300
     userRepository.addTracking(invoker, snowflake, timeout)
+    followManager.handleFollow(invoker, snowflake, timeout)
     val username =
         MemberBehavior(config.guild.snowflake, snowflake.snowflake, kord).asUser().username
     val timeoutCommentary =
@@ -141,12 +144,13 @@ class CommandManager(
     return "You are now following $username, $timeoutCommentary."
   }
 
-  private suspend fun handleUnfollow(command: InteractionCommand): String? {
-    val invoker = command.data.id.value?.value ?: return null
+  private suspend fun handleUnfollow(command: InteractionCommand, user: Member): String? {
+    val invoker = user.id.value
     val snowflake =
         command.strings["snowflake"]?.toULongOrNull() ?: return "Invalid Discord ID, you doofus."
     val username =
         MemberBehavior(config.guild.snowflake, snowflake.snowflake, kord).asUser().username
+    followManager.handleUnfollow(invoker, snowflake)
     return if (userRepository.removeTracking(invoker, snowflake)) {
       "Removed your follow for **$username**."
     } else {

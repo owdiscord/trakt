@@ -30,9 +30,9 @@ suspend fun main(args: Array<String>) {
   val progressManager = ProgressManager(bot, userRepository, config, scope).startCollection()
 //  VoiceProgressManager(bot, userRepository, config, scope).start()
   val sanctionManager = SanctionManager(userRepository, config, scope).startCollection()
-  val commandManager = CommandManager(bot, progressManager, userRepository, config)
-  val textCommandManager = TextCommandManager(bot, config, scope)
   val followManager = FollowManager(bot, userRepository, config, scope).start()
+  val commandManager = CommandManager(bot, progressManager, userRepository, followManager, config)
+  val textCommandManager = TextCommandManager(bot, config, scope)
 
   printLogging("Collection started")
   bot.on<MessageCreateEvent> {
