@@ -28,6 +28,7 @@ class UserRepository(config: TraktConfig) : Repository(config) {
       }
       SchemaUtils.create(UsersTable)
       SchemaUtils.create(VoiceSessionTable)
+      SchemaUtils.create(MessageTrackingTable)
       // sanity check people's message scores
       printLogging("Performing startup message score sanity check")
       UserEntity.find { UsersTable.messageScore greater (config.messageAwardThreshold + 10) }
