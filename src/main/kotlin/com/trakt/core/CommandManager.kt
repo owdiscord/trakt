@@ -57,6 +57,9 @@ class CommandManager(
         string("snowflake", "User ID") { required = true }
         integer("override", "Override value") { required = true }
       }
+      subCommand("report", "Show all trakt information for a user") {
+        string("snowflake", "User ID") { required = true }
+      }
       subCommand("reset", "Make trakt forget about a user completely") {
         string("snowflake", "User ID") { required = true }
       }
@@ -123,8 +126,23 @@ class CommandManager(
     return "Score for **$username** is **$score**."
   }
 
+  private suspend fun handleReport(command: InteractionCommand, user: Member): String {
+    val snowflake = command.strings["snowflake"]?.toULongOrNull() ?: return "Invalid Discord ID, you doofus"
+    val user = userRepository.getUserForReport(snowflake) ?: return "I'm not tracking **$user**"
+    val username =
+      MemberBehavior(config.guild.snowflake, snowflake.snowflake, kord).asUser().username
+    val report = """
+      All trakt info for **$username** ($user):
+      
+      Message score: ${user.messageScore}
+      Time score: ${user.timeScore}
+      Has role: ${user.hasAward}
+    """.trimIndent()
+    return report
+  }
+
   private suspend fun handleEdit(command: InteractionCommand, user: Member): String? {
-    val snowflake = command.strings["snowflake"]?.toULongOrNull() ?: return null
+    val snowflake = command.strings["snowflake"]?.toULongOrNull() ?: return "Invalid Discord ID, you doofus"
     val overrideValue = command.integers["override"] ?: return null
     val scoreType = command.strings["score_type"]
     when (scoreType) {

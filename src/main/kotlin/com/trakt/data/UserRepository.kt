@@ -321,6 +321,10 @@ class UserRepository(config: TraktConfig) : Repository(config) {
     return safeTransaction { UsersTable.deleteWhere { UsersTable.snowflake eq user } != 0 }
   }
 
+  suspend fun getUserForReport(user: ULong): UserEntity? {
+    return safeTransaction { UserEntity.find(UsersTable.snowflake eq user) }.firstOrNull()
+  }
+
   /** Return true if we removed a row */
   suspend fun removeTracking(owner: ULong, target: ULong): Boolean {
     return safeTransaction {
