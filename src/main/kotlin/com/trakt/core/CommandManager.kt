@@ -29,6 +29,7 @@ class CommandManager(
           "view" to ::handleView,
           "edit" to ::handleEdit,
           "reset" to ::handleReset,
+          "report" to ::handleReport,
           "follow" to ::handleFollow,
           "unfollow" to ::handleUnfollow,
       )
