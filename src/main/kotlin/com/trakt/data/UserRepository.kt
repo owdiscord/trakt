@@ -329,7 +329,7 @@ class UserRepository(config: TraktConfig) : Repository(config) {
   }
 
   suspend fun getUserForReport(user: ULong): UserEntity? {
-    return safeTransaction { UserEntity.find(UsersTable.snowflake eq user) }.firstOrNull()
+    return safeTransaction { UserEntity.find(UsersTable.snowflake eq user).firstOrNull() }
   }
 
   /** Return true if we removed a row */
