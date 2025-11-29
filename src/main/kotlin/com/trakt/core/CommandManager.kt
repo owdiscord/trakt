@@ -3,6 +3,7 @@ package com.trakt.core
 import com.trakt.data.UserRepository
 import dev.kord.core.Kord
 import dev.kord.core.behavior.MemberBehavior
+import dev.kord.core.behavior.channel.MessageChannelBehavior
 import dev.kord.core.behavior.interaction.response.respond
 import dev.kord.core.entity.Member
 import dev.kord.core.entity.interaction.GroupCommand
@@ -27,9 +28,15 @@ class CommandManager(
       mutableMapOf<String, suspend (InteractionCommand, Member) -> String?>(
           "view" to ::handleView,
           "edit" to ::handleEdit,
+          "reset" to ::handleReset,
           "follow" to ::handleFollow,
           "unfollow" to ::handleUnfollow,
       )
+
+  private suspend fun reportCommand(user: Member, report: String) {
+    val log = "**${user.id.value}** invoked command: $report"
+    MessageChannelBehavior(config.commandLogChannel.snowflake, kord).createMessage(log)
+  }
 
   suspend fun setupCommands() {
     kord.createGuildChatInputCommand(config.guild.snowflake, "trakt", "Interact with trakt") {
@@ -49,6 +56,9 @@ class CommandManager(
         }
         string("snowflake", "User ID") { required = true }
         integer("override", "Override value") { required = true }
+      }
+      subCommand("reset", "Make trakt forget about a user completely") {
+        string("snowflake", "User ID") { required = true }
       }
       subCommand("follow", "Be notified whenever a user posts") {
         string("snowflake", "User ID to follow") { required = true }
@@ -99,7 +109,7 @@ class CommandManager(
   }
 
   private suspend fun handleView(command: InteractionCommand, user: Member): String? {
-    val snowflake = command.strings["snowflake"]?.toULong() ?: return null
+    val snowflake = command.strings["snowflake"]?.toULongOrNull() ?: return null
     val score =
         when (command.strings["score_type"]) {
           "message_score" ->
@@ -114,19 +124,30 @@ class CommandManager(
   }
 
   private suspend fun handleEdit(command: InteractionCommand, user: Member): String? {
-    val snowflake = command.strings["snowflake"]?.toULong() ?: return null
+    val snowflake = command.strings["snowflake"]?.toULongOrNull() ?: return null
     val overrideValue = command.integers["override"] ?: return null
-    when (command.strings["score_type"]) {
+    val scoreType = command.strings["score_type"]
+    when (scoreType) {
       "message_score" -> progressManager.overrideMessageScore(snowflake, overrideValue)
       "time_score" -> userRepository.overrideTimeScore(snowflake, overrideValue)
       else -> return null
     }
+    reportCommand(user, "edited $scoreType for $snowflake to $overrideValue")
     val username =
         MemberBehavior(config.guild.snowflake, snowflake.snowflake, kord).asUser().username
     return "Score for **$username** is now **$overrideValue**."
   }
 
-  private suspend fun handleFollow(command: InteractionCommand, user: Member): String? {
+  private suspend fun handleReset(command: InteractionCommand, user: Member): String {
+    val snowflake = command.strings["snowflake"]?.toULongOrNull() ?: return "Invalid Discord ID, you doofus"
+    userRepository.resetUser(snowflake)
+    reportCommand(user, "reset all progress for $snowflake")
+    val username =
+      MemberBehavior(config.guild.snowflake, snowflake.snowflake, kord).asUser().username
+    return "Reset all trakt progress for **$username**."
+  }
+
+  private suspend fun handleFollow(command: InteractionCommand, user: Member): String {
     val invoker = user.id.value
     val snowflake =
         command.strings["snowflake"]?.toULongOrNull() ?: return "Invalid Discord ID, you doofus."

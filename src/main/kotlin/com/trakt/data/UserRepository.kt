@@ -5,6 +5,8 @@ package com.trakt.data
 import com.trakt.core.ProgressManager
 import com.trakt.core.TraktConfig
 import com.trakt.core.printLogging
+import kotlin.time.Clock
+import kotlin.time.ExperimentalTime
 import kotlinx.coroutines.DelicateCoroutinesApi
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.datetime.DatePeriod
@@ -14,8 +16,6 @@ import kotlinx.datetime.todayIn
 import org.jetbrains.exposed.sql.*
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
 import org.jetbrains.exposed.sql.transactions.transaction
-import kotlin.time.Clock
-import kotlin.time.ExperimentalTime
 
 class UserRepository(config: TraktConfig) : Repository(config) {
 
@@ -315,6 +315,10 @@ class UserRepository(config: TraktConfig) : Repository(config) {
             this.timeout = timeout
           }
     }
+  }
+
+  suspend fun resetUser(user: ULong): Boolean {
+    return safeTransaction { UsersTable.deleteWhere { UsersTable.snowflake eq user } != 0 }
   }
 
   /** Return true if we removed a row */

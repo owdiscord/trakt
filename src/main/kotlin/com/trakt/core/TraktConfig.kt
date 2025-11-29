@@ -49,7 +49,9 @@ data class TraktConfig(
     /** How often to process voice data */
     val voiceTickPeriod: Duration,
     /** Channel to announce follow alerts */
-    val followChannel: ULong
+    val followChannel: ULong,
+    /** Command log channel */
+    val commandLogChannel: ULong
 ) {
 
   companion object {
