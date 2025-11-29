@@ -129,11 +129,11 @@ class CommandManager(
 
   private suspend fun handleReport(command: InteractionCommand, user: Member): String {
     val snowflake = command.strings["snowflake"]?.toULongOrNull() ?: return "Invalid Discord ID, you doofus"
-    val user = userRepository.getUserForReport(snowflake) ?: return "I'm not tracking **$user**"
+    val user = userRepository.getUserForReport(snowflake) ?: return "I'm not tracking **$snowflake**"
     val username =
       MemberBehavior(config.guild.snowflake, snowflake.snowflake, kord).asUser().username
     val report = """
-      All trakt info for **$username** ($user):
+      All trakt info for **$username** ($snowflake):
       
       Message score: ${user.messageScore}
       Time score: ${user.timeScore}
