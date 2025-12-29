@@ -32,6 +32,7 @@ class CommandManager(
           "report" to ::handleReport,
           "follow" to ::handleFollow,
           "unfollow" to ::handleUnfollow,
+          "followlist" to ::handleFollowlist,
       )
 
   private suspend fun reportCommand(user: Member, report: String) {
@@ -71,6 +72,7 @@ class CommandManager(
             "Minimum duration, in seconds, between alerts for this follow (default 300)",
         )
       }
+      subCommand("followlist", "Show your currently active follows")
       subCommand("unfollow", "Remove a follow rule") {
         string("snowflake", "User ID to unfollow") { required = true }
       }
@@ -182,6 +184,15 @@ class CommandManager(
           "alerting on every message."
         }
     return "You are now following $username, $timeoutCommentary"
+  }
+
+  private suspend fun handleFollowlist(command: InteractionCommand, user: Member): String? {
+    val invoker = user.id.value
+    val follows = userRepository.showTracking(invoker)
+    if (follows.isEmpty()) {
+      return "You aren't following anyone."
+    }
+    return "You are following ${follows.joinToString(", ")}"
   }
 
   private suspend fun handleUnfollow(command: InteractionCommand, user: Member): String? {

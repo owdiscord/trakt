@@ -341,6 +341,12 @@ class UserRepository(config: TraktConfig) : Repository(config) {
     }
   }
 
+  suspend fun showTracking(owner: ULong): List<ULong> {
+    return safeTransaction {
+      MessageTrackingEntity.find { MessageTrackingTable.owner eq owner }.map { it.owner }
+    }
+  }
+
   suspend fun loadTrackingInfo(loadCb: (ULong, ULong, Int) -> Unit) {
     return safeTransaction {
       MessageTrackingEntity.all().forEach { loadCb(it.target, it.owner, it.timeout) }
