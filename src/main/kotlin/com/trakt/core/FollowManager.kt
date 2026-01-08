@@ -45,7 +45,7 @@ class FollowManager(
     }
   }
 
-  fun handleFollow(owner: ULong, target: ULong, timeout: Int) {
+  fun handleFollow(target: ULong, owner: ULong, timeout: Int) {
     activeFollows.getOrPut(target) { mutableMapOf() }[owner] =
         Pair(timeout, timeSource.markNow() - timeout.seconds)
   }
