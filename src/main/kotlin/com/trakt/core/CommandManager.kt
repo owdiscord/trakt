@@ -188,7 +188,7 @@ class CommandManager(
 
   private suspend fun handleFollowlist(command: InteractionCommand, user: Member): String? {
     val invoker = user.id.value
-    val follows = userRepository.showTracking(invoker)
+    val follows = userRepository.showTracking(invoker).map { "`$it`" }
     if (follows.isEmpty()) {
       return "You aren't following anyone."
     }
