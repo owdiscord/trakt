@@ -349,7 +349,7 @@ class UserRepository(config: TraktConfig) : Repository(config) {
 
   suspend fun loadTrackingInfo(loadCb: (ULong, ULong, Int) -> Unit) {
     return safeTransaction {
-      MessageTrackingEntity.all().forEach { loadCb(it.target, it.owner, it.timeout) }
+      MessageTrackingEntity.all().forEach { loadCb(it.owner, it.target, it.timeout) }
     }
   }
 }
