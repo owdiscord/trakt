@@ -50,7 +50,7 @@ class SanctionManager(
       }
       if (field.name == "Moderator") {
         // don't sanction automatic actions
-        if (Regex("<@!?(\\d+)>").find(field.value)?.groupValues?.getOrNull(1) == "473868086773153793") {
+        if (Regex("<@!?(\\d+)>").find(field.value)?.groupValues?.getOrNull(1) == "1459908058808586475") {
           printLogging("Skipping automatic sanction of user $user")
           return
         }
