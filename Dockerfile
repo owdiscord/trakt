@@ -13,9 +13,9 @@ COPY gradle.properties .
 # Make gradlew executable and pre-download dependencies
 RUN chmod +x gradlew && ./gradlew dependencies --no-daemon || true
 
-# Copy source and build the fat JAR
+# Copy source and build the JAR
 COPY src/ src/
-RUN ./gradlew shadowJar --no-daemon
+RUN ./gradlew build --no-daemon
 
 # Run the app!
 FROM eclipse-temurin:21-jre-alpine
