@@ -1,5 +1,3 @@
-ARG JARFILE="trakt-1.0-SNAPSHOT.jar"
-
 # Build stage
 FROM eclipse-temurin:21-jdk-alpine AS builder
 
@@ -17,10 +15,12 @@ RUN chmod +x gradlew && ./gradlew dependencies --no-daemon || true
 
 # Copy source and build the JAR
 COPY src/ src/
-RUN ./gradlew build --no-daemon
+RUN ./gradlew jar --no-daemon
 
 # Run the app!
 FROM eclipse-temurin:21-jre-alpine
+
+ARG JARFILE="trakt-1.0-SNAPSHOT.jar"
 
 WORKDIR /app
 
