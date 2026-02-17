@@ -1,3 +1,5 @@
+ARG JARFILE="trakt-1.0-SNAPSHOT.jar"
+
 # Build stage
 FROM eclipse-temurin:21-jdk-alpine AS builder
 
@@ -26,8 +28,8 @@ WORKDIR /app
 RUN addgroup -S trakt && adduser -S trakt -G trakt
 
 # Copy the fat JAR from the build stage
-COPY --from=builder /app/build/libs/*-all.jar app.jar
+COPY --from=builder /app/build/libs/${JARFILE} trakt.jar
 
 USER trakt
 
-CMD ["java", "-jar", "app.jar", "config.json"]
+CMD ["java", "-jar", "trakt.jar"]
