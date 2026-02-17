@@ -11,7 +11,7 @@ import kotlinx.coroutines.launch
 class SanctionManager(
     private val repository: UserRepository,
     private val config: TraktConfig,
-    private val scope: CoroutineScope
+    private val scope: CoroutineScope,
 ) {
   data class Penalty(val user: ULong, val actionType: String) {
     override fun toString(): String {
@@ -50,7 +50,10 @@ class SanctionManager(
       }
       if (field.name == "Moderator") {
         // don't sanction automatic actions
-        if (Regex("<@!?(\\d+)>").find(field.value)?.groupValues?.getOrNull(1) == "1459908058808586475") {
+        if (
+            Regex("<@!?(\\d+)>").find(field.value)?.groupValues?.getOrNull(1)?.toULongOrNull() ==
+                config.skipSanctionUser
+        ) {
           printLogging("Skipping automatic sanction of user $user")
           return
         }
@@ -60,8 +63,9 @@ class SanctionManager(
   }
 
   fun maybeSanction(event: MessageCreateEvent): Boolean {
-    if (event.message.channelId.value == config.sanctionChannel &&
-        event.message.webhookId != null) {
+    if (
+        event.message.channelId.value == config.sanctionChannel && event.message.webhookId != null
+    ) {
       // dealing with a new Zeppelin action
       if (event.message.embeds.size != 1) return false
       submitSanction(event.message.embeds.first())

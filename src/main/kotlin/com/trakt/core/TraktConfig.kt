@@ -51,7 +51,9 @@ data class TraktConfig(
     /** Channel to announce follow alerts */
     val followChannel: ULong,
     /** Command log channel */
-    val commandLogChannel: ULong
+    val commandLogChannel: ULong,
+    /** Skip sanctions done by this user */
+    val skipSanctionUser: ULong,
 ) {
 
   companion object {
