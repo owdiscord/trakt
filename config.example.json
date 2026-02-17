@@ -1,0 +1,30 @@
+{
+  "token": "Discord Token Here",
+  "guild": 1,
+  "role": 1,
+  "ancilliaryRoles": [
+    1,
+    2
+  ],
+  "sanctionChannel": 1,
+  "announceChannel": 1,
+  "messageAwardThreshold": 1.0,
+  "timeTrackingMessageThreshld": 1.0,
+  "timeAwardThreshold": 1.0,
+  "messageDecayMagnitude": 1,
+  "messageDecayPeriod": 1,
+  "messageTimeout": 1,
+  "warnDelayPeriods": 1.0,
+  "muteDelayPeriods": 1.0,
+  "banDelayPeriods": 1.0,
+  "timeScorePeriod": 1,
+  "progressSavePeriod": 1,
+  "trialMode": true,
+  "massRoleRole": 1,
+  "voiceWeekThreshold": 1,
+  "voiceMonthThreshold": 1,
+  "voiceTrackPeriod": 1,
+  "followChannel": 1,
+  "commandLogChannel": 1,
+  "skipSanctionUser": 1
+}
